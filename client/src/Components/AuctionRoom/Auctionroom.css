@@ -1,0 +1,33 @@
+
+.custom-dropdown .p-dropdown-label.p-placeholder {
+    color: rgba(255, 255, 255, 0.5); 
+  }
+  .custom-dropdown-item {
+    color: white;
+    background-color: #062541;
+    padding: 0.5rem;
+  }
+  
+  .custom-dropdown .p-dropdown-label {
+    color: white; 
+  }
+  .custom-dropdown .p-dropdown-panel {
+    background-color: white; 
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; 
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;  
+    scrollbar-width: none;  
+  }
+
+  .custom-paginator .p-paginator-page {
+    @apply text-blue-500; 
+}
+
+.custom-paginator .p-paginator-page.p-highlight {
+    @apply bg-blue-500 text-white rounded-full;
+}
+
+  

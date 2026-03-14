@@ -1,0 +1,116 @@
+html {
+  scroll-behaviour: smooth !important ;
+}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.featureSection::after {
+  -webkit-box-shadow: 0px 0px 100px 100px #66bee3;
+  -moz-box-shadow: 0px 0px 100px 100px #66bee3;
+  box-shadow: 0px 0px 100px 100px #66bee3;
+}
+.featureSection::before {
+  z-index: 10;
+  -webkit-box-shadow: 0px 0px 50px 30px white;
+  -moz-box-shadow: 0px 0px 50px 30px white;
+  box-shadow: 0px 0px 50px 30px white;
+}
+
+@keyframes toRight {
+  to {
+    transform: translate(calc(-100% - 30px));
+  }
+}
+#outer-wrapper {
+  -webkit-mask: linear-gradient(
+    90deg,
+    transparent,
+    white 20%,
+    rgb(244, 25, 25) 80%,
+    transparent
+  );
+  mask: linear-gradient(90deg, transparent, white 30%, white 70%, transparent);
+}
+
+@keyframes spinning {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinning {
+  animation: spinning 8s linear infinite;
+}
+
+.shining::before {
+  content: "";
+  @apply absolute top-1/2 left-0 w-full h-[500px] origin-top max-w-96 spinning;
+  background: linear-gradient(
+    to right,
+    transparent 10%,
+    #66bee3 25%,
+    white 50%,
+    #66bee3 65%,
+    transparent
+  );
+  @apply z-0;
+}
+
+.rdlGrdnt {
+  background-image: radial-gradient(
+    white 0%,
+    rgba(186, 233, 254, 0.97) 12%,
+    rgba(126, 215, 255, 0.57) 24%,
+    rgba(97, 206, 255, 0.43) 37%,
+    rgba(48, 176, 233, 0.23) 50%,
+    rgba(12, 163, 231, 0.16) 62%,
+    rgba(12, 163, 231, 0.06) 75%,
+    rgba(12, 163, 231, 0.02) 88%,
+    rgba(12, 163, 231, 0) 100%
+  );
+}
+
+.ctaBtn::after {
+  content: "";
+  @apply w-3/5 h-2 absolute left-1/2 -translate-x-1/2 bottom-[-4px] rounded-[100%] rdlGrdnt;
+}
+
+.friends::-webkit-scrollbar {
+  width: 5px;
+}
+
+.wiggleAnimation {
+  animation: wiggle 2s linear infinite;
+}
+
+/* Keyframes */
+@keyframes wiggle {
+  0%, 7% {
+    transform: rotateZ(0);
+  }
+  15% {
+    transform: rotateZ(-15deg);
+  }
+  20% {
+    transform: rotateZ(10deg);
+  }
+  25% {
+    transform: rotateZ(-10deg);
+  }
+  30% {
+    transform: rotateZ(6deg);
+  }
+  35% {
+    transform: rotateZ(-4deg);
+  }
+  40%, 100% {
+    transform: rotateZ(0);
+  }
+}
+
+.material-symbols-outlined, svg{
+  @apply cursor-pointer;
+}

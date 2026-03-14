@@ -1,0 +1,34 @@
+.slider{
+    position: relative;
+}
+
+.slider-track{
+    /* width: fit-content; */
+    /* width: calc(250px * 20); */
+    animation: scroll 20s linear infinite;
+    /* transform: translateX(-100%) */
+}
+
+@keyframes scroll{
+    0%{ 
+        transform: translate(0);
+    }
+    100%{
+        transform: translateX(-50%);
+    }
+}
+
+.cols{
+    column-count: 3;
+    column-gap: 10px;
+}
+
+.content{
+    
+    text-shadow: 0 0 20px #333;
+    width: 100%;
+    height: 20%;
+    border-radius: 0 0 10px 10px;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0%, rgba(255, 255, 255, 0) 100%);
+}
+
