@@ -8,7 +8,6 @@ import StepsContainer from "../../Components/Auction Steps Container/StepsContai
 import { useAuth0 } from "@auth0/auth0-react";
 import HomePageFooter from "../../Components/Home page footer/HomePageFooter";
 import ContactUs from "../../Components/Home page footer/ContactUs";
-import TeamComp from "../../Components/Home page footer/TeamComp";
 import { useNavigate } from "react-router-dom";
 import { ProgressSpinner } from "primereact/progressspinner";
 import star from "../../assets/Icons/star.svg";
@@ -106,7 +105,6 @@ function Home() {
           <OurMission />
           <Testimonials />
           <ContactUs displayToast={displayToast} />
-          <TeamComp />
           <HomePageFooter />
         </div>
       )}
