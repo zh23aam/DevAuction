@@ -8,7 +8,6 @@ import { FaFacebook } from "react-icons/fa";
 import { FaYoutube } from "react-icons/fa";
 
 import logo from "../../assets/LandingPage Images/logo remove background.svg";
-import TeamComp from './TeamComp'
 
 export default function HomePageFooter() {
   return (
