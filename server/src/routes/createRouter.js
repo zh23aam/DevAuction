@@ -8,6 +8,7 @@ const Room = require('../models/createRoom')
 const crypto = require('crypto')
 const Project = require('../models/project')
 const User = require("../models/user")
+const logger = require('../utils/logger')
 
 const router = express.Router()
 
@@ -93,15 +94,22 @@ function generateUniqueHexId() {
 }
 
 router.post('/project', upload.single("file"), async (req,res)=>{
+    const email = req.body.email
+    const title = req.body.title
+    logger.info(`[CREATE-PROJECT] Attempting to create project: ${title} by ${email}`)
+
     try{
         filename = req.file.filename
-        const fileuploadResponse = await authorize().then(uploadFile).catch("error",console.error())
+        const fileuploadResponse = await authorize().then(uploadFile).catch(err => {
+            logger.error(`[CREATE-PROJECT] Google Drive upload error for ${title}: `, err)
+            throw err
+        })
         const project_id = generateUniqueHexId()
         
         const {Owner, Image, Title,Status, Description, Tags,FileID, Link, ProjectID,OfferPrice} = {
-            Owner : req.body.email,
+            Owner : email,
             Image : req.body.image,
-            Title : req.body.title,
+            Title : title,
             Status : Boolean(false),
             Description: req.body.description,
             Tags : req.body.tags,
@@ -113,27 +121,34 @@ router.post('/project', upload.single("file"), async (req,res)=>{
 
 
         if (!Owner || !Image || !Title || !Description || !FileID || !Link || !OfferPrice || !ProjectID) {
+            logger.warn(`[CREATE-PROJECT] Missing required fields for project: ${title}`)
             return res.status(400).json({ message: 'Please fill in all required fields' })
         }
         else{
             const newProject = new Project({Owner, Image, Title, Description, Status, Tags, FileID, Link, ProjectID, OfferPrice, Offers : [], Sold : {}})
             await newProject.save()
+            logger.info(`[CREATE-PROJECT] Project document saved: ${project_id}`)
 
             fs.unlink(`./public/temp/${filename}`, (err) => {
                 if (err) {
-                    console.error(err);
+                    logger.error(`[CREATE-PROJECT] Error deleting temp file ${filename}: `, err)
                 } else {
-                    console.log('File deleted successfully!');
+                    logger.info(`[CREATE-PROJECT] Temp file deleted: ${filename}`)
                 }
             })
 
-            const user = await User.findOneAndUpdate({"UserInfo.email" : req.body.email},{ 
+            const user = await User.findOneAndUpdate({"UserInfo.email" : email},{ 
                 $push : {
                     "Profile.Projects" : project_id,
                 }
             })
 
-            await user.save()
+            if (user) {
+                await user.save()
+                logger.info(`[CREATE-PROJECT] User profile updated with project: ${project_id}`)
+            } else {
+                logger.error(`[CREATE-PROJECT] User not found during update: ${email}`)
+            }
 
             res.send({ message : "Project created successfully"})
         }
@@ -141,7 +156,8 @@ router.post('/project', upload.single("file"), async (req,res)=>{
         
     }catch(error)
     {
-        console.log(error)
+        logger.error(`[CREATE-PROJECT] Error creating project ${title}: `, error)
+        res.status(500).send("Internal Server Error")
     }
 })
 

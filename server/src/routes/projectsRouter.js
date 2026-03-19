@@ -2,21 +2,22 @@ const express = require('express')
 const router = express.Router()
 const Project = require('../models/project')
 const User = require("../models/user")
+const logger = require('../utils/logger')
 
 router.post('/getProject', async (req,res)=>{
     // Logic to get data of specific project 
 })
 
 router.post('/offers', async (req, res) => {
-    const projectID = req.body.projectID
-    const email = req.body.email
+    const { projectID, email } = req.body
     const offer = Number(req.body.offer)
-    console.log(projectID,email,offer)
+    logger.info(`[PROJECT-OFFERS] Placing offer: project=${projectID}, user=${email}, amount=${offer}`)
   
     try {
         const project = await Project.findOne({ ProjectID: projectID })
 
         if (!project) {
+            logger.warn(`[PROJECT-OFFERS] Project not found: ${projectID}`)
             return res.status(404).send('Project not found')
         }
 
@@ -27,6 +28,7 @@ router.post('/offers', async (req, res) => {
                 results : 0
             }) 
             await project.save()
+            logger.info(`[PROJECT-OFFERS] Offer saved to project: ${projectID}`)
 
             // logic to add data inside user spendings
             const user = await User.findOneAndUpdate({"UserInfo.email" : email},{
@@ -36,19 +38,22 @@ router.post('/offers', async (req, res) => {
 
             if(!user)
             {
-                res.status(500).json({message : "User Not found"})
+                logger.error(`[PROJECT-OFFERS] User not found for credit update: ${email}`)
+                return res.status(404).json({message : "User Not found"})
             }
 
             await user.save()
+            logger.info(`[PROJECT-OFFERS] User credits updated: ${email}`)
         
             res.status(201).send('Offer placed successfully')
         }
         else{
-            res.status(500).send("Amount should be greater than offer price")
+            logger.warn(`[PROJECT-OFFERS] Offer amount too low: ${offer} < ${project.OfferPrice}`)
+            res.status(400).send("Amount should be greater than offer price")
         }
 
     } catch (error) {
-        console.error(error);
+        logger.error(`[PROJECT-OFFERS] Error placing offer on project ${projectID}: `, error)
         res.status(500).send('Internal Server Error')
     }
 })

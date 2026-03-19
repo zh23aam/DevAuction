@@ -2,21 +2,27 @@ const express = require('express')
 const router = express.Router()
 const Room = require('../models/createRoom')
 const User = require("../models/user")
+const logger = require('../utils/logger')
 const sendEmail = require("../utils/email")
 
 router.post('/getHost', async (req,res)=>{
-    const roomID  = req.body.roomID
-    const email = req.body.email
-    console.log(roomID,email)
+    const { roomID, email } = req.body
+    logger.info(`[INSIDE-ROOM] Getting host info for room: ${roomID}, user: ${email}`)
   
     try {
         const room = await Room.findOne({ RoomID: roomID })
         const user = await User.findOne({ "UserInfo.email": email })
 
+        if (!room || !user) {
+            logger.warn(`[INSIDE-ROOM] Room or user not found: roomID=${roomID}, email=${email}`)
+            return res.status(404).send("Not found")
+        }
+
+        logger.info(`[INSIDE-ROOM] Host info retrieved: ${room.Owner}`)
         res.send({Owner : room.Owner, Credits : user.Profile.Credits})
         
     } catch (error) {
-        console.error(error);
+        logger.error(`[INSIDE-ROOM] Error in getHost for room ${roomID}: `, error)
         res.status(500).send('Internal Server Error')
     }
 })
@@ -52,6 +58,7 @@ router.post("/getLatestBid",async (req,res)=>{
 
 router.post('/bids', async (req, res) => {
     const { roomId, email, bid } = req.body
+    logger.info(`[INSIDE-ROOM] Placing bid: room=${roomId}, user=${email}, bid=${bid}`)
   
     try {
         const room = await Room.findOneAndUpdate({ RoomID: roomId },{
@@ -63,16 +70,17 @@ router.post('/bids', async (req, res) => {
         })
     
         if (!room) {
+            logger.warn(`[INSIDE-ROOM] Room not found for bid: ${roomId}`)
             return res.status(404).send('Room not found')
         }
         else{
             await room.save()
-
+            logger.info(`[INSIDE-ROOM] Bid placed successfully in room ${roomId}`)
             res.status(201).send('Bid placed successfully')
         }
         
     } catch (error) {
-        console.error(error);
+        logger.error(`[INSIDE-ROOM] Error placing bid in room ${roomId}: `, error)
         res.status(500).send('Internal Server Error')
     }
 })

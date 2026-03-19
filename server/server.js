@@ -2,6 +2,8 @@ const express = require('express')
 const cors = require('cors')
 const {createServer} = require('http')
 const {Server} = require('socket.io')
+const logger = require('./src/utils/logger')
+const loggerMiddleware = require('./src/middlewares/loggerMiddleware')
 const ConnectDB = require('./src/db/connection')
 const {PORT} = require('./constants')
 
@@ -24,6 +26,9 @@ ConnectDB()
 const app = express()
 app.use(express.json())
 
+// Enhanced request and response logging
+app.use(loggerMiddleware);
+
 // cors
 app.use(cors({origin : true}))
 
@@ -40,47 +45,47 @@ const emailToSocketIdMap = new Map()
 
 // socket.io connections
 io.on("connection",(socket)=>{
-    console.log("User connected : ",socket.id)
+    logger.info(`User connected: ${socket.id}`)
 
     socket.on("user:connected",async (data)=>{
         if(data.email){
             emailToSocketIdMap.set(data.email, socket.id)
-            console.log("new map inserted")
+            logger.info(`New map inserted for email: ${data.email}`)
         }
     })
 
     socket.on("user:message", async(data)=>{
         if(data.to){
             let reciverSocketID = emailToSocketIdMap.get(data.to)
-            console.log(data.from,data.to,data.message)
-            console.log("reciver socket.id : ",reciverSocketID)
+            logger.info(`Message from ${data.from} to ${data.to}: ${data.message}`)
+            logger.info(`Receiver socket.id: ${reciverSocketID}`)
             io.to(reciverSocketID).emit("user:message",{mes : data.message, at : Date.now()})
         }
     })
 
     socket.on("new:user",data=>{
-        console.log(data)
+        logger.info(`New user joined room ${data.roomID}: ${socket.id}`)
         io.to(data.roomID).emit("new:user",{message : "New user joined", id : socket.id})
     })
 
     socket.on("room:join",data => {
-        console.log(data)
+        logger.info(`User ${socket.id} joining room: ${JSON.stringify(data)}`)
         io.to(socket.id).emit("room:join",data)
     })
 
     socket.on("room:connect",data=>{
-        console.log(data)
+        logger.info(`User ${socket.id} connected to room ${data.roomID}`)
         socket.join(data.roomID)
         io.to(data.roomID).emit("room:connect",{message : "room joined successfully"})
     })
 
     socket.on("room:message",data => {
-        console.log(data.roomID)
+        logger.info(`Room message in ${data.roomID} from ${socket.id}`)
         io.to(data.roomID).emit("room:message",{message : data.message, sender : socket.id})
     })
 
     socket.on("on:bid",data=>{
-        console.log(data)
+        logger.info(`Bid placed in room ${data.roomID}: ${JSON.stringify(data)}`)
         io.to(data.roomID).emit("on:bid",{data})
     })
 
@@ -95,13 +100,13 @@ io.on("connection",(socket)=>{
                 emailToSocketIdMap.delete(key)
             }
         }
-        console.log("map deleted")  
+        logger.info(`User disconnected: ${socket.id}. Map entry deleted.`)  
     })
 })
 
 server.listen(PORT, ()=>{
-    console.log("Server started successfully")
-    console.log(`http://localhost:${PORT}`)
+    logger.info(`Server started successfully on port ${PORT}`)
+    logger.info(`http://localhost:${PORT}`)
 })
 
 app.get("/",(req, res)=>{

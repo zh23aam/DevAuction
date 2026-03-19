@@ -1,20 +1,23 @@
 const express = require("express")
+const router = express.Router()
 const ContactUs = require("../models/contactus")
 const sendEmail = require('../utils/email')
+const logger = require('../utils/logger')
 
-const router = express.Router()
 
 router.post("/",async (req,res)=>{
     const { Name, Email , PhoneNo, Message} = req.body
+    logger.info(`[CONTACT] Form submission from: ${Email} (${Name})`)
 
     try {
-
         if (!Name || !Email || !PhoneNo || !Message) {
+            logger.warn(`[CONTACT] Missing required fields for submission from ${Email}`)
             return res.status(400).json({ message: 'Please fill in all required fields' })
         }
 
         const newContact = new ContactUs({ Name , Email, PhoneNo, Message })
         await newContact.save()
+        logger.info(`[CONTACT] Contact record saved for ${Email}`)
 
         const subject = "Thanks for reaching out! We'll be in touch soon."
         const html = `
@@ -37,13 +40,13 @@ router.post("/",async (req,res)=>{
         `
 
         sendEmail(Email, subject, html)
+        logger.info(`[CONTACT] Confirmation email sent to ${Email}`)
 
         res.status(201).json({ message: 'Contact form submitted successfully!', data: newContact })
     } catch (err) {
-        console.error(err)
+        logger.error(`[CONTACT] Error processing contact form for ${Email}: `, err)
         res.status(500).json({ message: 'Server error: could not submit contact form' })
     }
-  
 })
 
 module.exports = router
