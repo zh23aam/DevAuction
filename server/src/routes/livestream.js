@@ -1,6 +1,11 @@
 const express = require('express')
 const router = express.Router()
-const webrtc = require('wrtc')
+let webrtc;
+try {
+    webrtc = require('wrtc');
+} catch (error) {
+    console.error("[LIVESTREAM] WebRTC could not be loaded. Livestreaming will be disabled.", error);
+}
 const Room = require("../models/createRoom")
 const logger = require('../utils/logger')
 
@@ -36,6 +41,10 @@ router.post("/roomDetails",async (req, res)=>{
 
 router.post("/broadcast",async (req,res)=>{
     logger.info("[LIVESTREAM] Starting broadcast")
+    if (!webrtc) {
+        logger.error("[LIVESTREAM] Broadcast failed - WebRTC module not loaded");
+        return res.status(503).json({ message: "Livestreaming is currently unavailable on this server environment." });
+    }
 
     try {
         const peer = new webrtc.RTCPeerConnection({
@@ -66,6 +75,10 @@ router.post("/broadcast",async (req,res)=>{
 
 router.post("/consumer",async (req,res)=>{
     logger.info("[LIVESTREAM] Consumer connection request")
+    if (!webrtc) {
+        logger.error("[LIVESTREAM] Consumer connection failed - WebRTC module not loaded");
+        return res.status(503).json({ message: "Livestreaming is currently unavailable on this server environment." });
+    }
 
     try {
         const peer = new webrtc.RTCPeerConnection({
