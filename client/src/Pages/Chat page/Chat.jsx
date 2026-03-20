@@ -1,45 +1,66 @@
-import React, { useEffect, useState } from "react";
-import ChatHeader from "../../Components/Chats Header/ChatHeader";
+import React, { useCallback, useEffect, useState } from "react";
+import TopBar from "../../Components/Common/TopBar";
 import ChatPeople from "../../Components/Chat people/ChatPeople";
 import ChatScreen from "../../Components/Chat screen/ChatScreen";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useMenuContext } from "../../context/MenuContextProvider";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+import { ProgressSpinner } from "primereact/progressspinner";
+
+import { useLocation } from "react-router-dom";
 
 export default function Chat() {
-  const {showMenu, setShowMenu} = useMenuContext();
+  const { showMenu, setShowMenu } = useMenuContext();
   const { user } = useAuth0();
-  const [selectedUser, setSelectedUser] = useState(null);
+  const location = useLocation();
+  const [selectedUser, setSelectedUser] = useState(location.state?.selectedUser || null);
   const [recentChatUsers, setRecentChatUsers] = useState([]);
-  const usersEmail = user?.email;
-  const [showChats, setShowChats] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showChats, setShowChats] = useState(!!location.state?.selectedUser);
 
-  async function getUsersRecentChats() {
-    const res = await fetch(`${SERVER_URL}/profile/inbox`, {
-      method: "POST",
-      body: JSON.stringify({ email: usersEmail }),
-      headers: {
-        "Content-type": "application/json; charset=UTF-8",
-      },
-    });
-    const data = await res?.json();
-    if (data) {
-      setRecentChatUsers(data?.data);
+  const getUsersRecentChats = useCallback(async () => {
+    if (!user?.email) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await api.post("/profile/inbox", { email: user.email });
+      const sortedUsers = (result?.data || []).sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+      setRecentChatUsers(sortedUsers);
+    } catch (err) {
+      console.error("Fetch Inbox Error:", err);
+    } finally {
+      setIsLoading(false);
     }
-  }
+  }, [user?.email]);
 
   useEffect(() => {
     getUsersRecentChats();
-  }, [user]);
+  }, [getUsersRecentChats]);
+
   return (
-    <div className="chatParent h-dvh flex flex-col">
-      <ChatHeader setShowMenu={setShowMenu} showMenu={showMenu} userName={user?.given_name} userImg={user?.picture}  />
+    <div className="chatParent h-dvh flex flex-col bg-transparent text-white">
+      <TopBar 
+        title="My Chats"
+        subtitle="Connect and collaborate with your peers"
+      />
       <div
-        className="chatBody flex flex-1 relative mb-4"
-        style={{ height: "calc(100vh * .78)" }}
+        className="chatBody flex flex-1 relative overflow-hidden"
+        style={{ 
+          height: "calc(100vh - 84px)", // accounting for TopBar height roughly
+          backgroundColor: "transparent"
+        }}
       >
-        <ChatPeople recentChatUsers={recentChatUsers} setSelectedUser={setSelectedUser} showChats={showChats} setShowChats={setShowChats} />
-        <ChatScreen selectedUser={selectedUser} myEmail={user?.email} showChats={showChats} setShowChats={setShowChats}  />
+        {isLoading ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4">
+            <ProgressSpinner style={{width: '40px', height: '40px'}} strokeWidth="4" />
+            <p className="text-gray-500 text-sm tracking-widest uppercase animate-pulse">Establishing Connection...</p>
+          </div>
+        ) : (
+          <>
+            <ChatPeople recentChatUsers={recentChatUsers} setSelectedUser={setSelectedUser} showChats={showChats} setShowChats={setShowChats} />
+            <ChatScreen selectedUser={selectedUser} myEmail={user?.email} showChats={showChats} setShowChats={setShowChats} />
+          </>
+        )}
       </div>
     </div>
   );

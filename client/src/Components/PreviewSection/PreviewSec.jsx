@@ -1,169 +1,150 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import Table from "./Table";
-import GradientBtn from "../Buttons/GradientBtn";
+import PrimaryButton from "../Common/PrimaryButton";
 import "./Preview.css";
 import { useNavigate, useParams } from "react-router-dom";
-import SERVER_URL from "../../contants.mjs";
+import { useAuth0 } from "@auth0/auth0-react";
+import api from "../../utils/api";
+import Badge from "../Common/Badge";
+import { isImageOrVideo } from "../../utils/helpers";
+import Makeoffer from "./Makeoffer";
 
-const PreviewSec = ({ show, setshow, tableData }) => {
+const PreviewSec = ({ show, setshow, tableData, getProjectOffers }) => {
+  const { user } = useAuth0();
   const navigate = useNavigate();
-  const params = useParams();
-  //   console.log("hello");
-  // console.log(params.id);
-  const [data, setdata] = useState([]);
-  const [arr, setarr] = useState([]);
-  const [url, seturl] = useState("");
-  const [eml, seteml] = useState("");
-  const [use, setuse] = useState([]);
+  const { id: projectID } = useParams();
+  
+  const [data, setdata] = useState(null);
+  const [owner, setOwner] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  function isImageOrVideo() {
-    const imageExtensions = [
-      "jpg",
-      "jpeg",
-      "png",
-      "gif",
-      "bmp",
-      "svg",
-      "webp",
-      "tiff",
-    ];
-    const videoExtensions = [
-      "mp4",
-      "mov",
-      "avi",
-      "mkv",
-      "flv",
-      "wmv",
-      "webm",
-      "m4v",
-    ];
-    // console.log(url)
-    const extension = url.split(".").pop().toLowerCase();
-
-    if (imageExtensions.includes(extension)) {
-      return "image";
-    } else if (videoExtensions.includes(extension)) {
-      return "video";
-    } else {
-      return "unknown";
-    }
-  }
-
-  const response = async () => {
-    // console.log(params.id);
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const res = await fetch(
-        `${SERVER_URL}/gallery/getProjectById`,
-        {
-          method: "POST",
-          body: JSON.stringify({ projectID: params.id }),
-          headers: {
-            "Content-type": "application/json; charset=UTF-8",
-          },
-        }
-      );
-      // console.log(res);
-      const newdata = await res.json();
-      setdata(newdata);
-      setarr(newdata.Tags);
-      console.log(newdata);
-      seteml(newdata.Owner);
-      seturl(newdata.Image);
+      const projectData = await api.post("/gallery/getProjectById", { projectID });
+      setdata(projectData);
+      
+      if (projectData.Owner) {
+        const userData = await api.post("/profile", { email: projectData.Owner });
+        setOwner(userData.userData);
+      }
     } catch (error) {
-      console.log(error);
+      console.error("Load Preview Error:", error);
+    } finally {
+      setIsLoading(false);
     }
-  };
-
-  const fetchuser = async () => {
-    console.log(eml);
-    try {
-      const res = await fetch(`${SERVER_URL}/profile`, {
-        method: "POST",
-        body: JSON.stringify({ email: eml }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
-      });
-      const newdata = await res.json();
-      setuse(newdata.userData);
-    } catch (error) {
-      console.log(error);
-    }
-  };
+  }, [projectID]);
 
   useEffect(() => {
-    response();
-  }, []);
-  useEffect(() => {
-    fetchuser();
-  }, [eml])
+    loadData();
+  }, [loadData]);
 
-  function redirectToProfile(){
-    navigate(`/homepage/gallery/searchprofile/${use._id}`)
-  }
+  const redirectToProfile = () => {
+    if (owner?._id) {
+      navigate(`/homepage/profile/${owner._id}`);
+    }
+  };
 
   return (
-    <>
+    <div className="w-full">
       {data && (
-        <div className="mt-6 flex h-[560px] justify-center gap-4 flex-wrap">
-          <div className="border-[#223534] w-[775px] flex flex-col gap-2">
-            <div className="text-[34px] font-semibold flex justify-between items-center">
-              {data.Title}{" "}
-              {/* <GradientBtn
-                className={"text-white w-fit h-10 text-base cursor-default"}
-                placeholder={<span>&#8377; {data.OfferPrice} </span>}
-              /> */}
-              <span className="font-semibold text-lg px-3 py-2 border-2 border-[#0ca2e739] bg-transparent"> &#8377; {data.OfferPrice}</span>
-            </div>
-            <div className="text-[#0CA3E7] text-justify flex flex-wrap">
-              {data.Description}
-            </div>
-            <div className="flex gap-2 mt-2 w-[300px] md:w-[500px] lg:w-[660px] overflow-scroll no-scrollbar ">
-              {arr.map((ele) => {
-                return (
-                  <div className="border-2 border-[#E0E0E0] border-opacity-15  text-[#11111] text-[12px] min-w-fit rounded-full mb-1 py-1 px-6 bg-gradient-to-b from-[#18203E] to-[#172748] ">
-                    {ele}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,400px] gap-8 items-start">
+          {/* Main Content Column */}
+          <div className="flex flex-col gap-6 animate-in slide-in-from-left duration-500">
+            {/* Action Section (Moved to Top) */}
+            {user?.email !== data.Owner && (
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 md:p-6 flex items-center justify-between backdrop-blur-md">
+                <div className="flex flex-col gap-1">
+                  <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest leading-relaxed">Interested in this architect's work?</p>
+                  <p className="text-sm font-black text-white leading-tight">Secure this project now</p>
+                </div>
+                <PrimaryButton 
+                  label="Place Your Offer" 
+                  onClick={() => setshow(!show)}
+                  variant="primary"
+                  className="!py-4 !px-8 shadow-xl"
+                />
+              </div>
+            )}
+
+            {/* Project Header Card */}
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-5 md:p-8 backdrop-blur-xl shadow-2xl overflow-visible">
+              <div className="flex flex-col justify-between items-start gap-4 mb-3">
+                <div className="flex-1 space-y-1">
+                  <h1 className="text-lg md:text-xl font-black tracking-tight text-white leading-tight">
+                    {data.Title}
+                  </h1>
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    {data.Category && (
+                      <Badge variant="primary" size="sm" className="bg-[#0CA3E7]/10 border-[#0CA3E7]/30">
+                        {data.Category}
+                      </Badge>
+                    )}
+                    {data.Tags?.map((tag, index) => (
+                      <Badge key={index} variant="premium" size="sm">
+                        {tag}
+                      </Badge>
+                    ))}
                   </div>
-                );
-              })}
-            </div>
-            <div className="border border-[#223534] mt-3 mb-4"></div>
-            <div className="flex justify-between mb-6 ">
-              <div className={`flex gap-2 justify-center items-center ${use ? "cursor-pointer" : "cursor-not-allowed"}`} onClick={use ? redirectToProfile : ""}>
-                <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black text-white">
-                  {use ? (
-                    <img
-                      className="h-[100%] w-[100%] rounded-full border-2 border-white"
-                      src={use?.UserInfo?.picture}
-                      alt=""
-                    />
-                  ) : (
-                    <div className="w-full h-full animate-pulse bg-gray-500 rounded-full"></div>
-                  )}
-                </span>
-                <div>
-                  {" "}
-                  {use ? (
-                    use.UserInfo?.name
-                  ) : (
-                    <span className="inline-block w-52 h-5 animate-pulse rounded-xl bg-gray-500 mt-1"></span>
-                  )}{" "}
                 </div>
               </div>
 
-              <GradientBtn
-                placeholder="Make offer"
-                onClick={() => {
-                  setshow(!show);
-                }}
-              />
+              <div className="relative border-t border-white/5 pt-4 mt-2">
+                <p className={`text-gray-400 text-[11px] md:text-sm leading-relaxed text-justify ${!isExpanded ? "line-clamp-2" : ""}`}>
+                  {data.Description}
+                </p>
+                {data.Description?.length > 100 && (
+                  <button 
+                    onClick={() => setIsExpanded(!isExpanded)}
+                    className="mt-2 text-[#0CA3E7] text-[10px] font-black uppercase tracking-widest hover:text-white transition-colors"
+                  >
+                    {isExpanded ? "Show Less" : "Read More"}
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="border-2  h-fit rounded-2xl border-[#223534] overflow-hidden  ">
-              {isImageOrVideo() == "image" ? (
+
+            {/* Project Media Container */}
+            <div className="group relative bg-[#0a0b1e] border-2 border-white/5 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-[#0CA3E7]/20 hover:ring-[#0CA3E7]/40 transition-all duration-500">
+              {/* Overlays */}
+              <div className="absolute inset-x-0 top-0 p-3 md:p-4 flex justify-between items-start z-20 pointer-events-none">
+                {/* Author Info */}
+                <div 
+                  className={`flex gap-3 items-center bg-black/60 backdrop-blur-xl border border-white/10 p-2 pr-5 rounded-full group/author transition-all hover:bg-black/80 pointer-events-auto ${owner ? "cursor-pointer" : "opacity-50"}`} 
+                  onClick={redirectToProfile}
+                >
+                  <div className="w-8 h-8 md:w-9 md:h-9 rounded-full border-2 border-[#0CA3E7]/50 p-0.5 overflow-hidden shadow-lg">
+                    {owner ? (
+                      <img
+                        className="w-full h-full object-cover rounded-full"
+                        src={owner.UserInfo?.picture}
+                        alt={owner.UserInfo?.name}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-white/5 animate-pulse rounded-full"></div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-black text-[#0CA3E7] uppercase tracking-[0.2em] leading-none mb-1">Architect</p>
+                    <p className="text-xs font-black text-white group-hover/author:text-[#0CA3E7] transition-colors tracking-tight leading-none">
+                      {owner ? owner.UserInfo?.name : "Loading..."}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Price Label */}
+                <div className="bg-[#0CA3E7] text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl md:rounded-2xl shadow-xl flex flex-col items-center justify-center shrink-0 pointer-events-auto border border-white/10">
+                  <span className="text-[6px] md:text-[7px] font-black uppercase tracking-[0.2em] opacity-80 leading-none mb-1">Price</span>
+                  <span className="text-sm md:text-base font-black leading-none">&#8377; {data.OfferPrice}</span>
+                </div>
+              </div>
+
+              {isImageOrVideo(data.Image) === "image" ? (
                 <img
-                  className="h-[100%] w-[100%] rounded-2xl object-cover"
+                  className="w-full aspect-video object-cover group-hover:scale-105 transition-transform duration-700"
                   src={data.Image}
-                  alt=""
+                  alt={data.Title}
                 />
               ) : (
                 <video
@@ -171,23 +152,39 @@ const PreviewSec = ({ show, setshow, tableData }) => {
                   autoPlay
                   muted
                   loop
-                  className="w-full h-fit object-cover "
+                  className="w-full aspect-video object-cover"
                 ></video>
               )}
+              
+              <div className="absolute inset-x-0 bottom-0 p-6 bg-gradient-to-t from-black/80 to-transparent flex justify-center translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
+                <PrimaryButton 
+                  label="Live Preview" 
+                  onClick={() => window.open(data.Link)}
+                  variant="gradient"
+                  className="scale-110 !px-10"
+                />
+              </div>
             </div>
-            <div className="flex justify-center gap-4 mb-4 mt-4 ">
-              <GradientBtn
-                placeholder="Live Preview"
-                onClick={() => {
-                  window.open(data.Link);
-                }}
-              />
+
+          </div>
+
+          {/* Sidebar / Bidding Table Column */}
+          <div className="h-full sticky top-28 animate-in slide-in-from-right duration-500">
+            <div className="bg-white/5 border border-white/10 rounded-3xl overflow-hidden backdrop-blur-xl shadow-2xl lg:min-h-[600px] flex flex-col">
+              <div className="bg-[#0CA3E7]/10 p-5 border-b border-white/10">
+                <h3 className="text-lg font-black text-white flex items-center gap-2 tracking-tight">
+                  <span className="w-1.5 h-6 bg-[#0CA3E7] rounded-full inline-block"></span>
+                  Bidding History
+                </h3>
+              </div>
+              <div className="flex-1">
+                <Table tableData={tableData} />
+              </div>
             </div>
           </div>
-          <Table tableData={tableData} />
         </div>
       )}
-    </>
+    </div>
   );
 };
 

@@ -1,18 +1,14 @@
-import React, { useState } from "react";
-import Header from "../Dashbord/Header";
+import React, { useState, useCallback } from "react";
 import LeftNavbar from "../Dashbord/LeftNavbar";
-import Slider from "./Slider";
-import SearchIcon from "../../assets/GalleryImages/search 02.png";
+import TopBar from "../Common/TopBar";
 import GallerySection from "./GallerySection";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useMenuContext } from "../../context/MenuContextProvider";
-import GradientBtn from "../Buttons/GradientBtn";
 import { ProgressSpinner } from "primereact/progressspinner";
 import ProfileSearch from "./ProfileSearch";
-import axios from "axios";
-import { FaGlassWater } from "react-icons/fa6";
-import CustomToast from "../../Components/Custom Toast/CustomToast";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+
+import { useToast } from "../../context/ToastContext";
 
 const Gallery = () => {
   const { user, isLoading } = useAuth0();
@@ -20,41 +16,23 @@ const Gallery = () => {
   const [search, setSearch] = useState("");
   const [searchdata, setSearchdata] = useState([]);
   const [showsearch, setShowsearch] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastDetails, setToastDetails] = useState({});
+  const { showToast } = useToast();
 
-  function displayToast(msg, type) {
-    setToastDetails((PrevState) => {
-      return { msg, type };
-    });
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 5000);
-  }
-
-  const clickhandler = async (e) => {
-    if (e.key !== "Enter") {
-      return;
-    }
-    setShowsearch(!showsearch);
+  const fetchSearchData = useCallback(async () => {
+    if (!search.trim()) return;
     try {
-      const res = await fetch(
-        `${SERVER_URL}/profile/getUsers`,
-        {
-          method: "POST",
-          body: JSON.stringify({ name: search }),
-          headers: {
-            "Content-type": "application/json; charset=UTF-8",
-          },
-        }
-      );
-
-      const data = await res.json();
-      setSearchdata(data.users);
-      // console.log(data) ;
+      const data = await api.post("/profile/getUsers", { name: search });
+      setSearchdata(data.users || []);
     } catch (err) {
-      console.log(err);
+      console.error("Search Error:", err);
+      showToast("Search failed", "red");
+    }
+  }, [search, showToast]);
+
+  const handleSearchKeyPress = (e) => {
+    if (e.key === "Enter") {
+      setShowsearch(true);
+      fetchSearchData();
     }
   };
 
@@ -72,20 +50,14 @@ const Gallery = () => {
       )}
       {!isLoading && (
         <div className="relative">
-          <CustomToast
-            className={
-              showToast ? "right-10 opacity-100" : "-right-96 opacity-0"
-            }
-            msg={toastDetails.msg}
-            type={toastDetails.type}
-            setShowToast={setShowToast}
-          />
           {showsearch && (
             <div className="absolute w-[80%] flex justify-center top-[150px]  z-10">
               <ProfileSearch
                 searchdata={searchdata}
                 showsearch={showsearch}
                 setShowsearch={setShowsearch}
+                displayToast={showToast}
+                refreshData={fetchSearchData}
               />
             </div>
           )}
@@ -93,39 +65,17 @@ const Gallery = () => {
           <div className="flex h-screen">
             {/* <LeftNavbar/> */}
             <div
-              className={`w-full overflow-y-scroll bg-[#050618] px-10 pb-10 text-white ${
+              className={`w-full overflow-y-auto bg-[#050618] text-white ${
                 showsearch ? " blur-2xl " : ""
-              } overflow-x-hidden`}
+              } overflow-x-hidden no-scrollbar`}
             >
-              <div className="w-80 aspect-square rounded-full absolute left-20 -top-24 bg-[#0CA3E7] bg-opacity-30 blur-[200px] z-[100] hidden lg:block"></div>
-
-              <Header
-                Username={user?.given_name}
-                UserImg={user?.picture}
-                isnav={showMenu}
-                setisnav={setShowMenu}
+              <TopBar 
+                title="Project Gallery" 
+                subtitle="Explore and bid on amazing projects"
               />
-              <Slider />
-              <div className="mt-6 relative">
-                <input
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                  }}
-                  onKeyDown={clickhandler}
-                  className="w-[100%] py-4 px-14 rounded-lg bg-[#0ca2e749] text-white "
-                  placeholder="Find someone....."
-                ></input>
-                {/* <div className="absolute top-2 right-2 z-10" >
-                  <GradientBtn placeholder="search" onClick={clickhandler} />
-                </div> */}
-                <img
-                  className="absolute top-4 left-4"
-                  src={SearchIcon}
-                  alt=""
-                />
+              <div className="pb-10">
+                <GallerySection displayToast={showToast} />
               </div>
-              <GallerySection displayToast={displayToast} />
             </div>
           </div>
         </div>

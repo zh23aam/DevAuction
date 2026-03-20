@@ -21,6 +21,10 @@ const createProjectSchema = new mongoose.Schema({
         type : [String],
         required : false
     },
+    Category : {
+        type : String,
+        required : false
+    },
     FileID : {
         type : String,
         required : true,

@@ -1,112 +1,113 @@
-import React, { useRef, useState } from "react";
+import React, { useState } from "react";
 import background from "../../assets/AuctionroomImages/Rectangle.png";
-import { Dropdown } from "primereact/dropdown";
-// import "./Auctionroom.css";
-import axios from "axios";
-import GradientBtn from "../Buttons/GradientBtn";
-import { useNavigate } from "react-router-dom";
-import { useAuth0 } from "@auth0/auth0-react";
+import PrimaryButton from "../Common/PrimaryButton";
 import { RxCross2 } from "react-icons/rx";
-import CustomToast from "../../Components/Custom Toast/CustomToast";
-import SERVER_URL from "../../contants.mjs";
+import { useToast } from "../../context/ToastContext";
+import api from "../../utils/api";
+import { useAuth0 } from "@auth0/auth0-react";
 
-const Makeoffer = ({ id, show, setshow, getProjectOffers }) => {
+const Makeoffer = ({ id, setshow, getProjectOffers, projectOwner, minPrice, userCredits }) => {
   const { user } = useAuth0();
   const [Amount, setAmount] = useState("");
-  const [showToast, setShowToast] = useState(false);
-  const [toastDetails, setToastDetails] = useState({});
-
-  function displayToast(msg, type) {
-    setToastDetails((PrevState) => {
-      return { msg, type };
-    });
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 5000);
-  }
+  const [isLoading, setIsLoading] = useState(false);
+  const { showToast } = useToast();
 
   const clickHandler = async () => {
-    console.log(user.email);
-    console.log(Amount);
-    console.log(id);
+    const offerAmount = Number(Amount);
+    
+    // 1. Valid Number Check
+    if (!Amount || isNaN(offerAmount) || offerAmount <= 0) {
+      showToast("Please enter a valid amount greater than 0", "yellow");
+      return;
+    }
 
+    // 2. Self-Bidding Check
+    if (user?.email === projectOwner) {
+      showToast("You cannot place an offer on your own project!", "red");
+      return;
+    }
+
+    // 3. Minimum Price Check
+    if (offerAmount < minPrice) {
+      showToast(`Offer must be at least ₹${minPrice}`, "yellow");
+      return;
+    }
+
+    // 4. Balance Check (1 INR = 100 Credits)
+    const requiredCredits = offerAmount * 100;
+    if (userCredits < requiredCredits) {
+      showToast(`Insufficient balance! Your current balance is ${userCredits} credits.`, "red");
+      return;
+    }
+
+    setIsLoading(true);
     try {
-      const response = await fetch(
-        `${SERVER_URL}/project/offers`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            email: user.email,
-            offer: Amount,
-            projectID: id,
-          }),
-          headers: {
-            "Content-type": "application/json; charset=UTF-8",
-          },
-        }
-      );
-      console.log(response);
-      if (!response.ok) {
-        displayToast("Bid amount should be greater than offer price!", "red");
-        return;
-      }else{
-        displayToast("Offer placed successfully!", "green");
-        setshow(!show);
-      }
-      getProjectOffers();
+      await api.post("/project/offers", {
+        email: user.email,
+        offer: Amount,
+        projectID: id,
+      });
+
+      showToast("Offer placed successfully!", "green");
+      setshow(false);
+      if (getProjectOffers) getProjectOffers();
     } catch (error) {
-      console.error(error.response ? error.response.data : error.message);
+      showToast(error.response?.data || error.message || "Failed to place offer", "red");
+    } finally {
+      setIsLoading(false);
     }
   };
+
   return (
-    <div
-      className={
-        "flex justify-center items-center relative lg:w-[900px] z-10 rounded-xl shadow-lg bg-[#050618] p-4"
-      }
-    >
-      <CustomToast
-        className={showToast ? "right-10 opacity-100" : "-right-96 opacity-0"}
-        msg={toastDetails.msg}
-        type={toastDetails.type}
-        setShowToast={setShowToast}
-      />
-      <RxCross2
-        className="absolute top-4  right-4 text-[24px]  z-20"
-        onClick={() => {
-          setshow(!show);
-        }}
-      />
-      <div className="flex flex-col items-center gap-4 font-semibold lg:w-[800px]  md:w-[400px] py-6 z-20 ">
-        <div className="w-full text-[40px] text-left  text-white">
-          Make Offer
+    <div className="flex justify-center items-center relative max-w-lg w-full text-white rounded-[32px] shadow-2xl overflow-hidden backdrop-blur-2xl bg-[#0a0b1e]/95 border border-white/10 animate-in fade-in zoom-in duration-300">
+      <button 
+        className="absolute top-6 right-6 text-white/40 hover:text-white transition-all z-50 p-2 hover:bg-white/10 rounded-full"
+        onClick={() => setshow(false)}
+      >
+        <RxCross2 size={20} />
+      </button>
+
+      <div className="flex flex-col items-start gap-8 w-full p-8 md:p-10 z-20 relative">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-black text-white tracking-tight">Place an Offer</h2>
+          <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Connect with the architect</p>
         </div>
 
-        <div className="border shadow-white  text-white w-[100%] h-[15%] rounded-md bg-[#bec0dd0d]">
-          <div className="flex flex-col gap-2 w-full p-6 ">
-            <label>Amount</label>
-            <input
-              value={Amount}
-              onChange={(e) => {
-                setAmount(e.target.value);
-              }}
-              placeholder="Enter Amount...."
-              className="bg-[#062541] rounded-full px-10 py-2 h-[40px] w-full md:w-14rem"
-            />
+        <div className="w-full space-y-6">
+          <div className="w-full px-6 py-5 rounded-3xl bg-white/5 border border-white/10 group focus-within:border-[#0CA3E7]/50 transition-all shadow-inner">
+            <p className="font-black text-[10px] uppercase tracking-[0.2em] text-[#0CA3E7] mb-3">Bid Amount (INR)</p>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-black text-gray-600">&#8377;</span>
+              <input
+                value={Amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                autoFocus
+                className="bg-transparent w-full outline-none text-2xl font-black text-white placeholder:text-gray-800"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="w-full text-left">
-          <GradientBtn
-            placeholder="Submit"
-            className="text-white"
+        <div className="flex flex-col w-full gap-3">
+          <PrimaryButton
+            label="Confirm Bid"
+            isLoading={isLoading}
+            className="w-full !py-5 !rounded-2xl text-base shadow-lg shadow-[#0CA3E7]/20"
             onClick={clickHandler}
           />
+          <button 
+            onClick={() => setshow(false)}
+            className="text-gray-500 hover:text-white transition-all font-bold text-xs py-3 rounded-xl hover:bg-white/5 uppercase tracking-widest"
+          >
+            Cancel Transaction
+          </button>
         </div>
       </div>
 
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0CA3E7]/10 via-transparent to-transparent pointer-events-none"></div>
       <img
-        className="absolute bottom-0 w-full h-auto md:h-full z-0  "
+        className="absolute inset-0 w-full h-full object-cover opacity-[0.03] pointer-events-none grayscale"
         alt=""
         src={background}
       />

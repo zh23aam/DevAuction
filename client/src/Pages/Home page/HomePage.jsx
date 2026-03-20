@@ -114,6 +114,7 @@ import { useMenuContext } from "../../context/MenuContextProvider";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useSocket } from "../../context/SocketProvider";
 import { GrGallery } from "react-icons/gr";
+import { ToastProvider } from "../../context/ToastContext";
 
 export default function HomePage() {
   const { user } = useAuth0();
@@ -158,82 +159,83 @@ export default function HomePage() {
 
   return (
     <div className="profileParent flex h-dvh overflow-hidden w-full text-white bg-[#05081B]">
-      <div
-        className={
-          "sideNav p-4 overflow-hidden bg-[#05081B]  w-64 max-w-[90vw]  md:static absolute h-full z-[9999] transition-all  duration-500 " +
-          ` ${showMenu ? "left-0" : "-left-64"}`
-        }
-        style={{ borderRight: "1px solid rgba(255, 255, 255, 0.28)" }}
-      >
-        <div className="header flex items-center justify-between">
-          <div className="logo text-xl">
-            <img src={logo} alt="Logo" className="w-28" />
+        {/* ... existing sidebar code ... */}
+        <div
+          className={
+            "sideNav p-4 overflow-hidden bg-[#05081B]  w-64 max-w-[90vw]  md:static absolute h-full z-[9999] transition-all  duration-500 " +
+            ` ${showMenu ? "left-0" : "-left-64"}`
+          }
+          style={{ borderRight: "1px solid rgba(255, 255, 255, 0.28)" }}
+        >
+          <div className="header flex items-center justify-between">
+            <div className="logo text-xl">
+              <img src={logo} alt="Logo" className="w-28" />
+            </div>
+            <RxCross2
+              size="1.5rem"
+              className="ml-auto md:hidden"
+              onClick={() => { 
+                console.log("clicked cross");
+                setShowMenu(false);
+              }}
+            />
           </div>
-          <RxCross2
-            size="1.5rem"
-            className="ml-auto md:hidden"
-            onClick={() => { 
-              console.log("clicked cross");
-              setShowMenu(false);
-            }}
-          />
+          <div className="navLinks py-4 h-full flex flex-col gap-2 justify-between">
+            <div className="links flex flex-col gap-4 text-gray-400">
+              <NavLink
+                to={"/homepage/dashboard"}
+                onClick={() => setShowMenu(false)}
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-white flex gap-2 items-center p-2 active"
+                    : "flex gap-2 items-center p-2 navLink"
+                }
+              >
+                <MdDashboard /> Dashboard
+              </NavLink>
+              <NavLink
+                to={"/homepage/profile"}
+                onClick={() => setShowMenu(false)}
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-white flex gap-2 items-center p-2 active"
+                    : "flex gap-2 items-center p-2 navLink"
+                }
+              >
+                <IoPersonCircle />
+                Profile
+              </NavLink>
+              <NavLink
+                to={"/homepage/chats"}
+                onClick={() => setShowMenu(false)}
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-white flex gap-2 items-center p-2 active"
+                    : "flex gap-2 items-center p-2 navLink"
+                }
+              >
+                <IoChatbubbleEllipsesSharp />
+                Chats
+              </NavLink>
+              <NavLink
+                to={"/homepage/gallery"}
+                onClick={() => setShowMenu(false)}
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-white flex gap-2 items-center p-2 active"
+                    : "flex gap-2 items-center p-2 navLink"
+                }
+              >
+                <GrGallery />
+                Gallery
+              </NavLink>
+            </div>
+            <LogoutButton />
+          </div>
         </div>
-        <div className="navLinks py-4 h-full flex flex-col gap-2 justify-between">
-          <div className="links flex flex-col gap-4 text-gray-400">
-            <NavLink
-              to={"/homepage/dashboard"}
-              onClick={() => setShowMenu(false)}
-              className={({ isActive }) =>
-                isActive
-                  ? "text-white flex gap-2 items-center p-2 active"
-                  : "flex gap-2 items-center p-2 navLink"
-              }
-            >
-              <MdDashboard /> Dashboard
-            </NavLink>
-            <NavLink
-              to={"/homepage/profile"}
-              onClick={() => setShowMenu(false)}
-              className={({ isActive }) =>
-                isActive
-                  ? "text-white flex gap-2 items-center p-2 active"
-                  : "flex gap-2 items-center p-2 navLink"
-              }
-            >
-              <IoPersonCircle />
-              Profile
-            </NavLink>
-            <NavLink
-              to={"/homepage/chats"}
-              onClick={() => setShowMenu(false)}
-              className={({ isActive }) =>
-                isActive
-                  ? "text-white flex gap-2 items-center p-2 active"
-                  : "flex gap-2 items-center p-2 navLink"
-              }
-            >
-              <IoChatbubbleEllipsesSharp />
-              Chats
-            </NavLink>
-            <NavLink
-              to={"/homepage/gallery"}
-              onClick={() => setShowMenu(false)}
-              className={({ isActive }) =>
-                isActive
-                  ? "text-white flex gap-2 items-center p-2 active"
-                  : "flex gap-2 items-center p-2 navLink"
-              }
-            >
-              <GrGallery />
-              Gallery
-            </NavLink>
-          </div>
-          <LogoutButton />
+        <div className="right overflow-auto w-full relative">
+          <Outlet />
         </div>
       </div>
-      <div className="right overflow-auto w-full relative">
-        <Outlet />
-      </div>
-    </div>
   );
 }

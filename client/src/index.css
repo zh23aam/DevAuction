@@ -1,5 +1,5 @@
 html {
-  scroll-behaviour: smooth !important ;
+  scroll-behavior: smooth !important ;
 }
 @tailwind base;
 @tailwind components;
@@ -78,6 +78,16 @@ html {
   @apply w-3/5 h-2 absolute left-1/2 -translate-x-1/2 bottom-[-4px] rounded-[100%] rdlGrdnt;
 }
 
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
 .friends::-webkit-scrollbar {
   width: 5px;
 }
@@ -113,4 +123,22 @@ html {
 
 .material-symbols-outlined, svg{
   @apply cursor-pointer;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(102, 190, 227, 0.4);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 190, 227, 0.3);
 }

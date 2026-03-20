@@ -21,36 +21,47 @@ router.post('/offers', async (req, res) => {
             return res.status(404).send('Project not found')
         }
 
-        if(offer >= project.OfferPrice){
-            project.Offers.push({
-                email : email,
-                amount : offer,
-                results : 0
-            }) 
-            await project.save()
-            logger.info(`[PROJECT-OFFERS] Offer saved to project: ${projectID}`)
-
-            // logic to add data inside user spendings
-            const user = await User.findOneAndUpdate({"UserInfo.email" : email},{
-                $inc : {"Profile.Credits" : -offer*100},
-                $push : {"Profile.Spendings" : {Category : "Offer", Amount : offer}}
-            })
-
-            if(!user)
-            {
-                logger.error(`[PROJECT-OFFERS] User not found for credit update: ${email}`)
-                return res.status(404).json({message : "User Not found"})
-            }
-
-            await user.save()
-            logger.info(`[PROJECT-OFFERS] User credits updated: ${email}`)
-        
-            res.status(201).send('Offer placed successfully')
+        if (offer <= 0) {
+            return res.status(400).send("Amount should be greater than 0")
         }
-        else{
-            logger.warn(`[PROJECT-OFFERS] Offer amount too low: ${offer} < ${project.OfferPrice}`)
-            res.status(400).send("Amount should be greater than offer price")
+
+        if (project.Owner === email) {
+            logger.warn(`[PROJECT-OFFERS] Self-bidding attempt: user=${email}, project=${projectID}`)
+            return res.status(400).send("You cannot place an offer on your own project")
         }
+
+        if (offer < project.OfferPrice) {
+            logger.warn(`[PROJECT-OFFERS] Offer too low: ${offer} < ${project.OfferPrice}`)
+            return res.status(400).send(`Offer must be at least ₹${project.OfferPrice}`)
+        }
+
+        const user = await User.findOne({ "UserInfo.email": email })
+        if (!user) {
+            logger.error(`[PROJECT-OFFERS] User not found: ${email}`)
+            return res.status(404).json({ message: "User Not found" })
+        }
+
+        const requiredCredits = offer * 100
+        if ((user.Profile?.Credits || 0) < requiredCredits) {
+            logger.warn(`[PROJECT-OFFERS] Insufficient credits: user=${email}, has=${user.Profile?.Credits}, needs=${requiredCredits}`)
+            return res.status(400).send(`Insufficient balance! Your current balance is ${user.Profile?.Credits || 0} credits.`)
+        }
+
+        // Processing Offer
+        project.Offers.push({
+            email: email,
+            amount: offer,
+            results: 0
+        })
+        await project.save()
+
+        // Deducting Credits
+        user.Profile.Credits -= requiredCredits
+        user.Profile.Spendings.push({ Category: "Offer", Amount: offer })
+        await user.save()
+
+        logger.info(`[PROJECT-OFFERS] Offer successful: project=${projectID}, user=${email}`)
+        res.status(201).send('Offer placed successfully')
 
     } catch (error) {
         logger.error(`[PROJECT-OFFERS] Error placing offer on project ${projectID}: `, error)

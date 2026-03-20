@@ -62,7 +62,7 @@ function HomePageHero({ loginWithRedirect }) {
         <div className="right lg:flex-1 absolute h-full w-full lg:static">
           <div className="absolute bottom-[-3.5rem] h-28 w-full bg-gradient-to-t from-[#050618] from-70% to-transparent z-0 text-white"></div>
           <video
-            src="./videos/Horizontal Scrolling Animation for Computer by Abhijeet.mp4"
+            src="/videos/Horizontal Scrolling Animation for Computer by Abhijeet.mp4"
             className="h-full w-full object-cover"
             width="100%"
             height="100vh"

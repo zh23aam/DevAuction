@@ -1,6 +1,4 @@
-import React, { useState } from 'react'
-import axios from 'axios'
-import SERVER_URL from '../../contants.mjs'
+import api from '../../utils/api';
 
 function UploadFiles() {
   
@@ -8,7 +6,9 @@ function UploadFiles() {
   const upload = () => {
     const formData = new FormData()
     formData.append('file', file)
-    axios.post(`${SERVER_URL}/uploads`, formData)
+    api.post('/uploads', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
       .then(response => {console.log(response)})
       .catch(error => console.log(error))
   }

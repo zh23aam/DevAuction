@@ -338,6 +338,7 @@ router.post('/inbox', async (req, res) => {
     
             for(let i = 0; i < lengthSent;i++){
                 const to = inbox.Messages[i].to
+                const lastMsg = inbox.Messages[i].data[inbox.Messages[i].data.length - 1];
                 if(!uniqueEmails.has(to)) {
                     const user = await User.findOne({"UserInfo.email" : to})
                     if (user) {
@@ -345,15 +346,24 @@ router.post('/inbox', async (req, res) => {
                             email : to,
                             name : user.UserInfo.name,
                             image : user.UserInfo.picture,
+                            lastMessageAt: lastMsg?.at || 0,
+                            lastMessage: lastMsg?.mes || ""
                         }
                         inboxArray.push(segregatedData)
                         uniqueEmails.add(to)
+                    }
+                } else {
+                    const existing = inboxArray.find(item => item.email === to);
+                    if (existing && lastMsg?.at > existing.lastMessageAt) {
+                        existing.lastMessageAt = lastMsg.at;
+                        existing.lastMessage = lastMsg.mes;
                     }
                 }
             }
     
             for(let i = 0; i < lengthRecived;i++){
                 const from = inbox.Recived[i].from
+                const lastMsg = inbox.Recived[i].data[inbox.Recived[i].data.length - 1];
                 if(!uniqueEmails.has(from)) {
                     const user = await User.findOne({"UserInfo.email" : from})
                     if (user) {
@@ -361,9 +371,17 @@ router.post('/inbox', async (req, res) => {
                             email : from,
                             name : user.UserInfo.name,
                             image : user.UserInfo.picture,
+                            lastMessageAt: lastMsg?.at || 0,
+                            lastMessage: lastMsg?.mes || ""
                         }
                         inboxArray.push(segregatedData)
                         uniqueEmails.add(from)
+                    }
+                } else {
+                    const existing = inboxArray.find(item => item.email === from);
+                    if (existing && lastMsg?.at > existing.lastMessageAt) {
+                        existing.lastMessageAt = lastMsg.at;
+                        existing.lastMessage = lastMsg.mes;
                     }
                 }
             }

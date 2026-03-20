@@ -1,257 +1,181 @@
-import React, { useEffect, useRef } from "react";
-import craditSecImg from "../../../public/Icons/craditesSectionImg.png";
-import craditeSecBg from "../../../public/Icons/craditeBG.png";
+import React, { useState, useCallback } from "react";
 import GradientBtn from "../Buttons/GradientBtn";
-import RazorpayButton from "../RazorpayButton/razorpaybutton";
 import { useAuth0 } from "@auth0/auth0-react";
-import { useState } from "react";
 import photo from "../../assets/LandingPage Images/logo remove background.svg";
-import { IoTrophy } from "react-icons/io5";
-import Transcations from "./Transcations";
-import { json } from "react-router-dom";
-import SERVER_URL from "../../contants.mjs";
+import Transactions from "./Transactions";
+import { useToast } from "../../context/ToastContext";
+import api from "../../utils/api";
+import { RAZORPAY_KEY_ID } from "../../utils/constants";
 
-function Cradites({ resp, trans, credits = 0, showtable, setshowTable, displayToast }) {
-  // const transectionsTable = useRef(null);
-  const [Amount, setAmount] = useState("");
+function Cradites({ resp, trans, credits = 0, showtable, setshowTable }) {
+  const [amount, setAmount] = useState("");
   const { user } = useAuth0();
-  const [trasctionss, setTransction] = useState([]);
+  const [localTransactions, setLocalTransactions] = useState([]);
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const { showToast } = useToast();
 
-  console.log(credits);
-
-  function loadRazorPay() {
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    document.body.appendChild(script);
-    script.onload = handleSubmit;
-  }
-
-  const showtranszac = async () => {
+  const fetchTransactions = async () => {
+    setIsActionLoading(true);
     try {
-      const response = await fetch(
-        `${SERVER_URL}/payments/transactions`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: user.email }),
-        }
-      );
-
-      console.log(response);
-      const data = await response.json();
-      console.log(data.transactions);
-      setTransction(data.transactions);
-      console.log("ye hai trans code ");
-      // setshowTable(true)
+      const data = await api.post("/payments/transactions", { email: user.email });
+      setLocalTransactions(data.transactions || []);
       setshowTable(!showtable);
     } catch (error) {
-      console.log(error);
+      console.error("Transaction Fetch Error:", error);
+      showToast("Failed to load transaction history", "red");
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
-  const widthdrawl = async () => {
-    console.log("koshish kr rahe hai");
-    if (Amount == "" || Amount == 0) {
-      displayToast("Enter some amount to withdraw", "red");
+  const handleWithdrawal = async () => {
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0) {
+      showToast("Enter a valid amount to withdraw", "red");
       return;
     }
-    if (Amount - credits > 0) {
-      displayToast("Amount can't be greater than balance!", "red");
+    if (numAmount > credits) {
+      showToast("Insufficient balance!", "red");
       return;
     }
-    console.log("amount tak poche hai");
-    const amount = Amount * 100;
+
+    setIsActionLoading(true);
     try {
-      const response = await fetch(
-        `${SERVER_URL}/payments/withdraw`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ email: user.email, amount: amount }),
-        }
-      );
-      console.log(response);
-      if (response.ok) {
-        displayToast("withdrawal successfull!", "green");
-        setAmount("");
-        resp();
-      }
+      await api.post("/payments/withdraw", { email: user.email, amount: numAmount * 100 });
+
+      showToast("Withdrawal successful!", "green");
+      setAmount("");
+      if (resp) resp(); // Refresh profile data
     } catch (error) {
-      console.log(error);
+      console.error("Withdrawal Error:", error);
+      showToast(error.message || "Withdrawal failed. Please try again.", "red");
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
-  async function handleSubmit() {
-    const amount = Amount * 100;
-
-    console.log(Amount);
-    if (amount > 50000000) {
-      displayToast("Amount should be less than 500000", "red");
+  const loadRazorPay = useCallback(() => {
+    const numAmount = parseFloat(amount);
+    if (!numAmount || numAmount <= 0) {
+      showToast("Enter a valid amount to deposit", "red");
       return;
     }
+
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = handleDeposit;
+    document.body.appendChild(script);
+  }, [amount, showToast]);
+
+  const handleDeposit = async () => {
+    const depositAmount = parseFloat(amount) * 100;
+    
+    if (depositAmount > 50000000) {
+      showToast("Maximum deposit amount is ₹500,000", "red");
+      return;
+    }
+
+    setIsActionLoading(true);
     try {
-      const response = await fetch(`${SERVER_URL}/payments`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ amount: amount }),
-      });
+      const result = await api.post("/payments", { amount: depositAmount });
 
-      const result = await response.json();
-
-      if (response.ok) {
-        var options = {
-          key_id: "rzp_test_w1PnHafmCNsrDy",
-          amount: `${result.amount}`,
-          currency: "INR",
-          name: "DevAuction",
-          description: "Test Transaction",
-          image: { photo },
-          order_id: `${result.id}`,
-          handler: function (response) {
-            displayToast("Payment successfull!", "green");
-            resp();
+      const options = {
+        key: RAZORPAY_KEY_ID, 
+        amount: `${result.amount}`,
+        currency: "INR",
+        name: "DevAuction",
+        description: "Credit Deposit",
+        image: photo,
+        order_id: `${result.id}`,
+        handler: function (response) {
+          showToast("Payment successful! Updating balance...", "green");
+          setTimeout(() => {
+            if (resp) resp();
             setAmount("");
-          },
-          prefill: {
-            name: `${user.name}`,
-            email: `${user.email}`,
-            contact: "9322679131",
-          },
-          notes: {
-            address: "DevAuction Corporate Office",
-          },
-          theme: {
-            color: "#3399cc",
-          },
-        };
-        console.log(options);
+          }, 2000); // 2 second delay for webhook processing
+        },
+        prefill: {
+          name: user.name || "",
+          email: user.email || "",
+        },
+        theme: { color: "#0CA3E7" },
+      };
 
-        var rzp1 = new Razorpay(options);
-        await rzp1.open();
+      const rzp = new window.Razorpay(options);
+      rzp.open();
 
-        rzp1.on("payment.failed", function (response) {
-          displayToast(response.error.code, "red");
-          displayToast(response.error.description, "red");
-          displayToast(response.error.source, "red");
-          displayToast(response.error.step, "red");
-          displayToast(response.error.reason, "red");
-          displayToast(response.error.metadata.order_id, "red");
-          displayToast(response.error.metadata.payment_id, "red");
-        });
-      }
-
-      //   console.log(responsePayment)
+      rzp.on("payment.failed", function (response) {
+        showToast(`Payment failed: ${response.error.description}`, "red");
+      });
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Deposit Error:", error);
+      showToast("Could not initiate payment. Please try again.", "red");
+    } finally {
+      setIsActionLoading(false);
     }
-  }
+  };
+;
 
   return (
-    <>
-      <section className="p-3" id="cradites">
-        <div
-          className={`mx-auto lg:w-[100%] border-[#223534] bg-[#050b1e] border-2 flex items-center justify-between rounded-xl `}
-        >
-          <div
-            style={{
-              backgroundImage: 'url("../../../public/Icons/craditeBG.png")',
-            }}
-            className=" rounded-xl w-[100%] bg-cover bg-center"
-          >
-            <h4 className="text-2xl font-semibold ml-5 my-3">My Credits</h4>
-            <div className="flex gap-2 flex-wrap">
-              <div className="bg-[#0567FC] ml-5 flex rounded-xl text-lg bg-opacity-30 px-3 py-2">
-                ₹
-                <input
-                  value={Amount}
-                  type="number"
-                  placeholder="Amount"
-                  onChange={(e) => {
-                    setAmount(e.target.value);
-                  }}
-                  className="border-none w-[100%] text-lg pl-1 outline-none bg-transparent text-white placeholder:text-white"
-                  name=""
-                  id=""
-                />
-              </div>
-
-              <div className="ml-5  md:ml-0">
-                <GradientBtn
-                  placeholder="Withdraw"
-                  className=" mb-2 md:m-0  w-fit"
-                  onClick={widthdrawl}
-                />
-                <GradientBtn
-                  placeholder="Deposit"
-                  onClick={() => {
-                    if(Amount == "" || Amount == 0){
-                      displayToast("Enter some amount!", "red")
-                      return;
-                    }
-                    loadRazorPay();
-                  }}
-                />
-              </div>
-            </div>
-            <p className="text-[#0CA3E7] font-semibold mt-2 ml-5 mb-4">
-              Balance (₹ {credits})
-            </p>
-          </div>
-          {/* <div className='h-[100%] hidden lg:block'>
-                        <img src={craditSecImg} className='h-full object-cover rounded-xl' alt="" />
-                    </div> */}
-        </div>
-
-        <div className="mt-5 lg:flex justify-between">
-          <div className="border-2 border-[#223534] lg:mb-0 rounded-lg py-3 lg:basis-[99%]">
-            <h4 className="text-2xl font-semibold ml-3 my-3">
-              Transaction history
-            </h4>
-            <div className="flex flex-col gap-0">
-              {/* <div className='bg-[#0567FC] flex rounded-xl text-lg bg-opacity-30 px-3 py-2 w-[90%] mx-auto'>
-                                <span className="material-symbols-outlined">
-                                    wallet
-                                </span>
-                                No Transaction history
-                            </div> */}
-              <GradientBtn
-                className="mx-4 w-fit"
-                placeholder="Show Transactions"
-                onClick={showtranszac}
+    <section className="p-3" id="credits">
+      <div className="mx-auto w-full border-[#0CA3E7]/20 bg-[#0f1325]/50 border flex items-center justify-between rounded-xl overflow-hidden relative">
+        <div className="rounded-xl w-full bg-cover bg-center p-4 md:p-[16px]" style={{ backgroundImage: 'url("/Icons/craditeBG.png")' }}>
+          <h4 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent mb-4">My Credits</h4>
+          <div className="flex gap-4 flex-wrap items-center">
+            <div className="bg-black/20 flex items-center rounded-xl text-lg px-4 py-2.5 border border-white/10 focus-within:border-[#0CA3E7]/40 transition-all shadow-inner">
+              <span className="mr-2 text-[#0CA3E7] font-bold">₹</span>
+              <input
+                value={amount}
+                type="number"
+                placeholder="0.00"
+                onChange={(e) => setAmount(e.target.value)}
+                className="border-none w-32 md:w-48 text-lg outline-none bg-transparent text-white placeholder:text-gray-600"
+                disabled={isActionLoading}
               />
-              {showtable && (
-                <div className="p-4">
-                  <Transcations transctions={trasctionss} />
-                </div>
-              )}
+            </div>
+
+            <div className="flex gap-3">
+              <GradientBtn
+                placeholder={isActionLoading ? "..." : "Withdraw"}
+                className="w-28 text-sm"
+                onClick={handleWithdrawal}
+                disabled={isActionLoading}
+              />
+              <GradientBtn
+                placeholder={isActionLoading ? "..." : "Deposit"}
+                className="w-28 text-sm"
+                onClick={loadRazorPay}
+                disabled={isActionLoading}
+              />
             </div>
           </div>
+          <p className="text-[#0CA3E7] font-semibold mt-4 text-xl">
+            Available Balance: ₹ {credits.toFixed(2)}
+          </p>
+        </div>
+      </div>
 
-          {/* <div className="border-2 border-[#223534] rounded-lg py-3 lg:basis-[49%]">
-            <h4 className="text-https://dev-auction.vercel.app2xl font-semibold ml-3 my-3">
-              Transaction history
-            </h4>
-            <div>
-              <div className="bg-[#0567FC] flex rounded-xl text-lg bg-opacity-30 px-3 py-2 w-[90%] mx-auto">
-                <span className="material-symbols-outlined">wallet</span>
-                No Transaction history
-              </div>
+      <div className="mt-6">
+        <div className="border-2 border-[#223534] rounded-lg py-4 bg-[#050b1e]/50">
+          <div className="flex justify-between items-center px-6 mb-4">
+            <h4 className="text-2xl font-semibold">Transaction History</h4>
+            <GradientBtn
+              placeholder={showtable ? "Hide" : "Show Transactions"}
+              className="w-fit scale-90"
+              onClick={fetchTransactions}
+              disabled={isActionLoading}
+            />
+          </div>
+          
+          {showtable && (
+            <div className="px-6 animate-in fade-in slide-in-from-top-2 duration-300">
+              <Transactions transactions={localTransactions.length > 0 ? localTransactions : trans} />
             </div>
-          </div> */}
+          )}
         </div>
-      </section>
-      {/* {showtable && (
-        <div className=" p-4">
-          <Transcations transctions={trasctionss} />
-        </div>
-      )} */}
-    </>
+      </div>
+    </section>
   );
 }
 

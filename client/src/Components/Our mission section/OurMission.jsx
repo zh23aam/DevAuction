@@ -34,7 +34,7 @@ export default function OurMission() {
   ];
   return (
     <div
-      id="mission"
+      id="about-us"
       className="ourMissionSection flex flex-col lg:gap-24 gap-10 justify-center xl:h-dvh max-[1280px]:py-10 text-white bg-[#050618]"
     >
       <div className="heading lg:text-4xl text-xl sm:text-2xl uppercase text-center font-semibold ">

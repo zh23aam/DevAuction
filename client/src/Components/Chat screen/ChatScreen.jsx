@@ -3,261 +3,142 @@ import ChatScreenHeader from "./ChatScreenHeader";
 import ChatScreenFooter from "./ChatScreenFooter";
 import ChatBtn from "./ChatBtn";
 import logo from "../../assets/LandingPage Images/logo remove background.svg";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+import useChatLogic from "../../hooks/useChatLogic";
+import ProjectSelectionModal from "./ProjectSelectionModal";
+import { useAuth0 } from "@auth0/auth0-react";
+import { useSocket } from "../../context/SocketProvider";
 
 const ChatScreen = React.memo(({ selectedUser, myEmail, showChats, setShowChats }) => {
-  const [msgs, setMsgs] = useState([]);
+  const [msgs, setMsgs] = useState({ myMessages: [], senderMessages: [] });
+  const [showProjectModal, setShowProjectModal] = useState(false);
+  const { user } = useAuth0();
+  const socket = useSocket();
   const messagesContainerRef = useRef(null);
-  const [msgComps, setMsgComps] = useState([]);
+  
+  const processedMessages = useChatLogic(msgs);
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
-      const { scrollHeight, clientHeight } = messagesContainerRef.current;
-      messagesContainerRef.current.scrollTop = scrollHeight - clientHeight;
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
     }
   };
 
   useEffect(() => {
     scrollToBottom();
-  }, [msgComps]);
-
-  function useDate(initialValue) {
-    let state = initialValue;
-
-    function getState() {
-      return state;
-    }
-
-    function setState(newValue) {
-      state = newValue;
-    }
-
-    return [getState, setState];
-  }
-
-  const [getDate, setDate] = useDate("");
-
-  function genrateMsgs() {
-    let i = 0;
-    let j = 0;
-    const today = new Date();
-    const yesterday = new Date(today);
-    const items = [];
-    const myMessages = msgs?.myMessages;
-    const sendersMessages = msgs?.senderMessages;
-    while (i < myMessages?.length && j < sendersMessages?.length) {
-      if (myMessages[i].at < sendersMessages[j].at) {
-        const date = new Date(myMessages[i].at);
-        const localDate = date.toLocaleDateString();
-        const localTime = date.toLocaleTimeString();
-        if (getDate() !== localDate) {
-          setDate(localDate);
-          items.push(
-            <>
-              <div
-                className="text-xs w-full text-center text-gray-400"
-                key={localTime}
-              >
-                {localDate}
-              </div>
-              <ChatBtn
-                msg={myMessages[i].mes}
-                sender={"to"}
-                time={localTime}
-                key={myMessages[i].mes + localTime}
-              />
-            </>
-          );
-        } else {
-          items.push(
-            <ChatBtn
-              msg={myMessages[i].mes}
-              sender={"to"}
-              time={localTime}
-              key={myMessages[i].mes + localTime}
-            />
-          );
-        }
-        i++;
-      } else {
-        const date = new Date(sendersMessages[j].at);
-        const localDate = date.toLocaleDateString();
-        const localTime = date.toLocaleTimeString();
-        if (getDate() !== localDate) {
-          setDate(localDate);
-          items.push(
-            <>
-              <div
-                className="text-xs w-full text-center text-gray-400"
-                key={localDate}
-              >
-                {localDate}
-              </div>
-              <ChatBtn
-                msg={sendersMessages[j].mes}
-                sender={"from"}
-                time={localTime}
-                key={sendersMessages[j].mes + localTime}
-              />
-            </>
-          );
-        } else {
-          items.push(
-            <ChatBtn
-              msg={sendersMessages[j].mes}
-              sender={"from"}
-              time={localTime}
-              key={sendersMessages[j].mes + localTime}
-            />
-          );
-        }
-        j++;
-      }
-    }
-
-    while (i < myMessages?.length) {
-      const date = new Date(myMessages[i].at);
-      const localDate = date.toLocaleDateString();
-      const localTime = date.toLocaleTimeString();
-      if (getDate() !== localDate) {
-        setDate(localDate);
-        items.push(
-          <>
-            <div
-              className="text-xs w-full text-center text-gray-400"
-              key={localDate}
-            >
-              {localDate}
-            </div>
-            <ChatBtn
-              msg={myMessages[i].mes}
-              sender={"to"}
-              time={localTime}
-              key={myMessages[i].mes + localTime}
-            />
-          </>
-        );
-      } else {
-        items.push(
-          <ChatBtn
-            msg={myMessages[i].mes}
-            sender={"to"}
-            time={localTime}
-            key={myMessages[i].mes + localTime}
-          />
-        );
-      }
-      i++;
-    }
-
-    while (j < sendersMessages?.length) {
-      const date = new Date(sendersMessages[j].at);
-      const localDate = date.toLocaleDateString();
-      const localTime = date.toLocaleTimeString();
-      if (getDate() !== localDate) {
-        setDate(localDate);
-        items.push(
-          <>
-            <div
-              className="text-xs w-full text-center text-gray-400"
-              key={localDate}
-            >
-              {localDate}
-            </div>
-            <ChatBtn
-              msg={sendersMessages[j].mes}
-              sender={"from"}
-              time={localTime}
-              key={sendersMessages[j].mes + localTime}
-            />
-          </>
-        );
-      } else {
-        items.push(
-          <ChatBtn
-            msg={sendersMessages[j].mes}
-            sender={"from"}
-            time={localTime}
-            key={sendersMessages[j].mes + localTime}
-          />
-        );
-      }
-      j++;
-    }
-    // return items;
-    setMsgComps(items);
-  }
+  }, [processedMessages]);
 
   const getMsgs = async () => {
-    console.log("getting msgs from server");
-    const res = await fetch(`${SERVER_URL}/profile/chats`, {
-      method: "POST",
-      body: JSON.stringify({
+    if (!selectedUser?.email) return;
+    try {
+      const userMsgs = await api.post("/profile/chats", {
         me: myEmail,
-        other: selectedUser?.email,
-      }),
-      headers: {
-        "Content-type": "application/json; charset=UTF-8",
-      },
-    });
-    const userMsgs = await res.json();
-    if (userMsgs) {
-      setMsgs(userMsgs);
+        other: selectedUser.email,
+      });
+      if (userMsgs) setMsgs(userMsgs);
+    } catch (error) {
+      console.error("Fetch Messages Error:", error);
     }
   };
-
-  useEffect(genrateMsgs, [msgs])
 
   useEffect(() => {
     getMsgs();
   }, [selectedUser]);
 
+  const handleProjectSelect = async (project) => {
+    const projectData = {
+      id: project.ProjectID,
+      title: project.Title,
+      image: project.Image || project.image,
+      owner: project.Owner || project.owner
+    };
+    
+    const projectMsg = `[PROJECT_MENTION]${JSON.stringify(projectData)}`;
+    
+    socket.emit("user:message", {
+      from: user.email,
+      to: selectedUser.email,
+      message: projectMsg,
+    });
+
+    try {
+      await api.post("/profile/chat/send", {
+        from: user.email,
+        to: selectedUser.email,
+        message: projectMsg,
+      });
+
+      setMsgs(prevState => ({
+        ...prevState, 
+        myMessages: [...(prevState.myMessages || []), { mes: projectMsg, at: new Date().getTime() }]
+      }));
+      setShowProjectModal(false);
+    } catch (error) {
+      console.error("Send Project Error:", error);
+    }
+  };
+
   return (
-    <div className={`right lg:w-2/3 h-full w-full py-7 pr-6 max-[1024px]:pl-6 absolute lg:static hidden lg:block overflow-hidden ${showChats ? "max-[1024px]:block" : "hidden"}`}>
-      <div
-        className="screen w-full rounded-xl h-full relative flex items-center pt-24 pb-20"
-        style={{
-          backgroundColor: "rgba(7, 38, 67, 0.4)",
-          boxShadow: "0 2.93px 3.67px 1.47px rgba(121, 197, 239, 0.38)",
-        }}
-      >
-        {selectedUser ? (
-          <>
-            <ChatScreenHeader
+    <div className={`flex-1 h-full relative overflow-hidden flex flex-col bg-[#050618]/30 ${!showChats ? "max-[1024px]:hidden" : "flex"}`}>
+      {selectedUser ? (
+        <div className="flex-1 flex flex-col h-full relative">
+          <ChatScreenHeader
             setShowChats={setShowChats}
-              imgSrc={selectedUser?.image}
-              userName={selectedUser?.name}
-            />
-            <div
-              className="msgs h-full my-auto overflow-auto p-2 px-6 w-full flex flex-col gap-4 z-0"
-              ref={messagesContainerRef}
-              key={"msgsContainer"}
-            >
-              {selectedUser &&
-                msgComps.map((msgComp) => {
-                  {/* console.log(msgComp); */}
-                  return msgComp;
-                })}
-            </div>
-            <ChatScreenFooter
-              genrateMsgs={genrateMsgs}
-              receiversMailId={selectedUser.email}
-              msgs={msgs}
-              setMsgs={setMsgs}
-              setMsgComps={setMsgComps}
-              key={"ChatScreenFooter"}
-            />
-          </>
-        ) : (
-          <div className="logo flex w-full h-full justify-center items-center flex-col gap-2 select-none">
-            <div className="text-3xl font-bold text-[#66bee3]"><img src={logo} alt="DevAuction" className="w-60 h-20 object-cover opacity-30" style={{filter: "grayscale(100%)"}}  /></div>
-            <div className="text-gray-600">
-              Select someone to start chatting
-            </div>
+            imgSrc={selectedUser?.image}
+            userName={selectedUser?.name}
+          />
+          <div
+            className="msgs flex-1 overflow-auto p-4 md:p-8 flex flex-col gap-5 z-0 custom-scrollbar"
+            ref={messagesContainerRef}
+            key={"msgsContainer"}
+          >
+            {processedMessages.map((item) => {
+              if (item.isDateHeader) {
+                return (
+                  <div className="text-[10px] w-full text-center text-white/20 uppercase tracking-[0.3em] font-bold my-6" key={item.id}>
+                    {item.label}
+                  </div>
+                );
+              }
+              return (
+                <ChatBtn
+                  key={item.id}
+                  msg={item.mes}
+                  sender={item.type}
+                  time={item.localTime}
+                />
+              );
+            })}
           </div>
-        )}
-      </div>
+          <ChatScreenFooter
+            receiversMailId={selectedUser.email}
+            setMsgs={setMsgs}
+            key={"ChatScreenFooter"}
+            onToggleProjectModal={() => setShowProjectModal(!showProjectModal)}
+          />
+          <ProjectSelectionModal
+            isOpen={showProjectModal}
+            onClose={() => setShowProjectModal(false)}
+            senderEmail={user?.email}
+            receiverEmail={selectedUser.email}
+            onSelect={handleProjectSelect}
+          />
+        </div>
+      ) : (
+        <div className="flex-1 flex items-center justify-center p-8 text-center flex-col gap-6 select-none bg-white/[0.02]">
+          <div className="w-24 h-24 rounded-full bg-white/5 flex items-center justify-center">
+            <img src={logo} alt="DevAuction" className="w-16 h-16 object-contain opacity-20 grayscale" />
+          </div>
+          <div className="flex flex-col gap-2">
+            <h2 className="text-2xl font-bold text-white/80">Select a Conversation</h2>
+            <p className="text-white/30 text-sm max-w-[280px] mx-auto leading-relaxed">
+              Choose a person from your list to see your message history and start collaborating.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 });
+
 export default ChatScreen;

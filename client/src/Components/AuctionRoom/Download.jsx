@@ -1,97 +1,111 @@
-import React, { useRef, useState } from "react";
-import background from "../../assets/AuctionroomImages/Rectangle.png";
-import { Dropdown } from "primereact/dropdown";
-import "./Auctionroom.css";
-import axios from "axios";
-import GradientBtn from "../Buttons/GradientBtn";
-import { useNavigate } from "react-router-dom";
-import { useAuth0 } from "@auth0/auth0-react";
+import React, { useState } from "react";
 import { RxCross2 } from "react-icons/rx";
-import { saveAs } from 'file-saver';
-import SERVER_URL from "../../contants.mjs";
+import GradientBtn from "../Buttons/GradientBtn";
+import background from "../../assets/AuctionroomImages/Rectangle.png";
+import "./Auctionroom.css";
+import api from "../../utils/api";
+import { useToast } from "../../context/ToastContext";
 
 const Download = ({ show, setshow }) => {
-  const navigate = useNavigate();
-  const { user } = useAuth0();
   const [fileid, setfileid] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const { showToast } = useToast();
 
-  const clickHandler = async () => {
-    console.log(fileid);
-    setshow(!show);
-    const formData = new FormData();
-    formData.append("fileID", fileid);
+  const clickHandler = async (e) => {
+    if (e) e.preventDefault();
+    
+    if (!fileid.trim()) {
+      showToast("Please enter a File ID", "red");
+      return;
+    }
 
+    setIsLoading(true);
     try {
-
-      const response = await axios({
-        url : `${SERVER_URL}/create/download`,
-        method : "POST",
-        responseType : "blob",
-        data : {fileID : fileid},
+      // Use api.post directly with responseType in config
+      const response = await api.post("/create/download", { fileID: fileid.trim() }, {
+        responseType: "blob",
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
-      console.log(response)
+
+      // Axios-based api utility returns response.data directly in the interceptor
+      // But for blob we need the whole response if we want to check type, 
+      // however my api.js interceptor returns response.data.
+      // Let's check api.js again.
       
-      const filename = 'sourcecode.zip'
+      const blob = response; // response is data because of interceptor
 
-      try {
-
-        saveAs(response.data, filename);
-      } catch (error) {
-        console.error('Error creating ZIP file:', error)
+      // Check if blob is actually an error JSON
+      if (blob.type === 'application/json') {
+        const text = await blob.text();
+        const errorData = JSON.parse(text);
+        throw new Error(errorData.message || "File not found or access denied");
       }
+
+      const filename = `sourcecode_${fileid.slice(0, 6)}.zip`;
+      saveAs(blob, filename);
       
+      showToast("Download started successfully!", "green");
+      setshow(false);
+      setfileid("");
     } catch (error) {
-      console.error('Error downloading file:', error)
+      console.error('Error downloading file:', error);
+      showToast(error.message || "Failed to download file", "red");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const getTodayDate = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, "0"); // Months are zero-indexed
-    const dd = String(today.getDate()).padStart(2, "0");
-    return `${yyyy}-${mm}-${dd}`;
-  };
-
   return (
-    <div
-      className={
-        "flex justify-center items-center relative md:w-[900px] z-10 rounded-xl shadow-lg bg-[#050618]"
-      }
-    >
-      <RxCross2
-        className="absolute top-4  right-4 text-[24px]  z-20"
-        onClick={() => {
-          setshow(!show);
-        }}
-      />
-      <div className="flex flex-col items-center gap-4 font-semibold md:w-[800px]  w-[300px] py-6 z-20 ">
-        <div className="w-full text-[40px] text-left  text-white">Download</div>
+    <div className="flex justify-center items-center relative max-w-xl w-[95%] z-[1002] rounded-3xl shadow-2xl bg-[#0f1325]/95 border border-[#0CA3E7]/20 p-4 overflow-hidden animate-in fade-in zoom-in duration-300">
+      <button 
+        className={`absolute top-4 right-4 text-white/50 hover:text-white transition-colors z-[500] p-1.5 hover:bg-white/10 rounded-full ${isLoading ? 'opacity-20 pointer-events-none' : ''}`}
+        onClick={() => setshow(false)}
+      >
+        <RxCross2 size={18} />
+      </button>
+      
+      <form onSubmit={clickHandler} className="flex flex-col items-start gap-5 w-full p-4 md:p-[16px] z-20 relative text-left">
+        <h2 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent tracking-tight">Download Project</h2>
 
-        <div className="border shadow-white  text-white w-[100%] h-[18%] rounded-md bg-[#bec0dd0d]">
-          <div className="flex flex-col gap-2 w-full p-6 ">
-            <label className="text-[16px]">File ID</label>
+        <p className="text-gray-400 text-xs -mt-2 opacity-80 leading-relaxed">
+          Enter the unique File ID sent to your email or from the project details to retrieve your source code.
+        </p>
+
+        <div className="w-full">
+          <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/30 border border-[#0CA3E7]/10 group focus-within:border-[#0CA3E7]/40 transition-all">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">File ID*</label>
             <input
               value={fileid}
-              onChange={(e) => {
-                setfileid(e.target.value);
-              }}
-              placeholder="Enter File......"
-              className="bg-[#062541] rounded-full px-10 py-2 h-[30px] w-full md:w-14rem"
+              onChange={(e) => setfileid(e.target.value)}
+              placeholder="E.g., 65f2a..."
+              className="bg-black/20 focus:bg-black/30 transition-all rounded-xl px-4 py-3 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white font-mono text-xs placeholder:text-gray-500 placeholder:font-sans"
+              disabled={isLoading}
+              required
             />
           </div>
         </div>
-        <div className="w-full text-left">
+
+        <div className="w-full flex items-center gap-4 mt-2">
           <GradientBtn
-            placeholder="Submit"
-            className="text-white"
-            onClick={clickHandler}
+            type="submit"
+            placeholder={isLoading ? "Searching..." : "Download File"}
+            className="text-xs px-6 py-1"
+            disabled={isLoading}
           />
+          <button 
+            type="button"
+            onClick={() => setshow(false)}
+            className="text-gray-500 hover:text-white transition-colors font-semibold text-xs px-4 py-1 border border-gray-700 rounded-full hover:bg-white/5"
+          >
+            Cancel
+          </button>
         </div>
-      </div>
+      </form>
 
       <img
-        className="absolute bottom-0 w-full h-auto md:h-full z-0  "
+        className="absolute bottom-0 w-full h-auto opacity-10 z-0 pointer-events-none"
         alt=""
         src={background}
       />

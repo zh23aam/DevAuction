@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { FiPlus } from "react-icons/fi";
 
-const ProductCounter = ({ end }) => {
+const Counters = ({ end }) => {
   const [count, setCount] = useState(0);
 
   useEffect(() => {
     let start = 0;
-    const duration = 2000; // 2 seconds
-    const increment = end / (duration / 10); // update every 10ms
+    const duration = 2000;
+    const increment = end / (duration / 10);
 
     const timer = setInterval(() => {
       start += increment;
@@ -24,9 +24,10 @@ const ProductCounter = ({ end }) => {
 
   return (
     <div className="text-center flex items-center text-xl font-bold md:text-4xl sm:text-3xl lg:text-left">
-      {count.toLocaleString()} <FiPlus size={window.innerWidth > 678 ? "1.5rem" : "0.8rem"} className='mt-1'  style={{strokeWidth: "4px"}}/>
+      {count.toLocaleString()} 
+      <FiPlus className='mt-1 ml-1 text-sm sm:text-lg md:text-2xl' style={{ strokeWidth: "4px" }} />
     </div>
   );
 };
 
-export default ProductCounter;
+export default Counters;

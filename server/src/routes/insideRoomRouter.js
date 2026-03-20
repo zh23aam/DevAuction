@@ -49,9 +49,9 @@ router.post("/getLatestBid",async (req,res)=>{
             user = await User.findOne({"UserInfo.email" : email})
         }
 
-        res.send({name : user.UserInfo.name, picture : user.UserInfo.picture, highestBid})
+        res.send({name : user ? user.UserInfo.name : "Unknown", picture : user ? user.UserInfo.picture : "", highestBid})
     } catch (error) {
-        console.error(error);
+        logger.error(`[INSIDE-ROOM] Error in getLatestBid for room ${roomID}: `, error)
         res.status(500).send('Internal Server Error')
     }
 })
@@ -95,11 +95,16 @@ router.post('/sendMailToBider', async (req, res) => {
             return res.status(404).send('Room not found')
         }
 
+        if (!room.Bids || room.Bids.length === 0) {
+            logger.warn(`[INSIDE-ROOM] No bids found in room ${roomID} during email process`)
+            return res.status(400).send('No bids found in this room')
+        }
+
         const highestBid = Math.max(...room.Bids.map(bid => bid.amount))
-        console.log("higest bid in paisa",highestBid*100)
+        logger.info(`[INSIDE-ROOM] Highest bid in paisa: ${highestBid * 100}`)
 
         const highestBidders = room.Bids.filter(bid => bid.amount === highestBid)
-        console.log("higesht bidder : ",highestBidders)
+        logger.info(`[INSIDE-ROOM] Highest bidders: `, highestBidders)
 
         let message = '';
         if (highestBidders.length === 1) {
@@ -189,10 +194,10 @@ router.post('/sendMailToBider', async (req, res) => {
 
         await sendEmail(room.Owner, subjectOwner, htmlOwner)
 
-        console.log(message)
+        logger.info(message)
         res.status(200).send('Highest bidder information processed successfully')
     } catch (error) {
-        console.error(error)
+        logger.error(`[INSIDE-ROOM] Error in sendMailToBider for room ${roomID}: `, error)
         res.status(500).send('Internal Server Error')
     }
 });

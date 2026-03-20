@@ -1,117 +1,124 @@
 import React, { useCallback, useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useSocket } from "../../context/SocketProvider"
-import axios from "axios"
-import SERVER_URL from "../../contants.mjs"
+import api from "../../utils/api";
 
 const Room = ()=> {
-    const socket = useSocket()
-    const {roomID} = useParams()
+  const socket = useSocket()
+  const {roomID} = useParams()
 
-    const [message , setMessage] = useState('')
+  const [message , setMessage] = useState('')
 
-    useEffect(() => {
-        console.log("inside room", roomID)
-        socket.emit("new:user", {roomID})
-    }, [roomID,socket]) 
+  useEffect(() => {
+    console.log("inside room", roomID)
+    socket.emit("new:user", {roomID})
+  }, [roomID,socket]) 
 
-    const handleMessageRequest = (data)=>{
-        console.log(data)
+  const handleMessageRequest = (data)=>{
+    console.log(data)
+  }
+
+  useEffect(() => {
+    socket.on("room:message", handleMessageRequest);
+    return () => {
+      socket.off("room:message", handleMessageRequest);
+    };
+  }, [socket, handleMessageRequest]);
+
+  const handleMessage = (e)=>{
+    e.preventDefault()
+    if(!message) 
+    {
+      return
     }
+    console.log(message)
 
-    useEffect(() => {
-        socket.on("room:message", handleMessageRequest);
-        return () => {
-            socket.off("room:message", handleMessageRequest);
-        };
-    }, [socket, handleMessageRequest]);
+    socket.emit("room:message",{message : message,roomID : roomID})
+  }
 
-    const handleMessage = (e)=>{
-        e.preventDefault()
-        if(!message) 
-        {
-            return
-        }
-        console.log(message)
+  const newUser = async (data)=>{
+    console.log(data)
+    // if new user joins only allow admin to send peer to him
+  }
 
-        socket.emit("room:message",{message : message,roomID : roomID})
-    }
-
-    const newUser = async (data)=>{
-        console.log(data)
-        // if new user joins only allow admin to send peer to him
-    }
-
-    useEffect(() => {
-            socket.on("new:user",newUser)
-        
-            return () => {
-            socket.off("new:user",newUser)
-            }
-        }, [
-            socket,
-            newUser
-    ])
-
-    //////////////////////////////////////////////////////
-
-    function createPeer() {
-        try{
-            const peer = new RTCPeerConnection({
-                iceServers: [
-                    {
-                        urls: "stun:stun.stunprotocol.org"
-                    }
-                ]
-            });
-            peer.onnegotiationneeded = () => handleNegotiationNeededEvent(peer)
-        
-            return peer
-        }catch(error){
-            console.log(error)
-        }
-    }
-
-    async function handleNegotiationNeededEvent(peer) {
-        const offer = await peer.createOffer()
-        await peer.setLocalDescription(offer)
-        const payload = {
-            sdp: peer.localDescription
-        };
+  useEffect(() => {
+      socket.on("new:user",newUser)
     
-        const { data } = await axios.post(`${SERVER_URL}/livestream/broadcast`, payload)
-        console.log(data)
-        const desc = new RTCSessionDescription(data.sdp)
-        peer.setRemoteDescription(desc).catch(e => console.log(e))
-    }
+      return () => {
+      socket.off("new:user",newUser)
+      }
+    }, [
+      socket,
+      newUser
+  ])
 
-    const handleVideo = async (e)=>{
-        e.preventDefault()
+  //////////////////////////////////////////////////////
 
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true ,audio : true})
-        document.getElementById("video").srcObject = stream
-        const peer = createPeer()
-        stream.getTracks().forEach(track => peer.addTrack(track, stream))
-    }
-
-    /////////////////////////////////////////
-
-    function handleTrackEvent(e) {
-        document.getElementById("videoView").srcObject = e.streams[0]
-    }
-
-    async function handleNegotiationNeededEventView(peer) {
-        const offer = await peer.createOffer()
-        await peer.setLocalDescription(offer)
-        const payload = {
-            sdp: peer.localDescription
-        };
+  function createPeer() {
+    try{
+      const peer = new RTCPeerConnection({
+        iceServers: [
+          {
+            urls: "stun:stun.stunprotocol.org"
+          }
+        ]
+      });
+      peer.onnegotiationneeded = () => handleNegotiationNeededEvent(peer)
     
-        const { data } = await axios.post(`${SERVER_URL}/livestream/consumer`, payload)
-        console.log(data)
-        const desc = new RTCSessionDescription(data.sdp)
-        peer.setRemoteDescription(desc).catch(e => console.log(e))
+      return peer
+    }catch(error){
+      console.log(error)
     }
+  }
+
+  async function handleNegotiationNeededEvent(peer) {
+    const offer = await peer.createOffer()
+    await peer.setLocalDescription(offer)
+    const payload = {
+      sdp: peer.localDescription
+    };
+
+    try {
+      const data = await api.post("/livestream/broadcast", payload);
+      console.log(data)
+      const desc = new RTCSessionDescription(data.sdp)
+      peer.setRemoteDescription(desc).catch(e => console.log(e))
+    } catch (error) {
+      console.error("Broadcast Negotiation Error:", error);
+    }
+  }
+
+  const handleVideo = async (e)=>{
+    e.preventDefault()
+
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true ,audio : true})
+    document.getElementById("video").srcObject = stream
+    const peer = createPeer()
+    stream.getTracks().forEach(track => peer.addTrack(track, stream))
+  }
+
+  /////////////////////////////////////////
+
+  function handleTrackEvent(e) {
+    document.getElementById("videoView").srcObject = e.streams[0]
+  }
+
+  async function handleNegotiationNeededEventView(peer) {
+    const offer = await peer.createOffer()
+    await peer.setLocalDescription(offer)
+    const payload = {
+      sdp: peer.localDescription
+    };
+
+    try {
+      const data = await api.post("/livestream/consumer", payload);
+      console.log(data)
+      const desc = new RTCSessionDescription(data.sdp)
+      peer.setRemoteDescription(desc).catch(e => console.log(e))
+    } catch (error) {
+      console.error("Consumer Negotiation Error:", error);
+    }
+  }
 
     function createPeerView() {
         try{

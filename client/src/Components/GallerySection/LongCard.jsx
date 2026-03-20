@@ -23,11 +23,11 @@ const LongCard = ({ title, offerPrice, assetSrc, type }) => {
             ></video>
           )}
         </div>
-        <div className="flex justify-between ">
-          <div className=" font-bold ">{title || "Wonder Kids Website"}</div>
-          <div className="flex gap-2">
+        <div className="flex justify-between items-start gap-3">
+          <div className="font-bold text-sm line-clamp-2 flex-1 leading-tight text-white/90">{title || "Wonder Kids Website"}</div>
+          <div className="flex items-center gap-1.5 shrink-0 text-xs font-bold text-[#0CA3E7]">
             {/* <img src={eye} alt="" /> */}
-            &#8377;
+            <span>&#8377;</span>
             <span>{offerPrice || "Free"}</span>
           </div>
         </div>

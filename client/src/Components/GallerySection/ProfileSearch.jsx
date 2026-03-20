@@ -1,116 +1,92 @@
-import React from "react";
-import SearchIcon from "../../assets/GalleryImages/search 02.png";
-import { RxCross2 } from "react-icons/rx";
-import GradientBtn from "../Buttons/GradientBtn";
-import { Link } from "react-router-dom";
+import React, { useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
-import { ProgressSpinner } from "primereact/progressspinner";
-import SERVER_URL from "../../contants.mjs";
+import { useToast } from "../../context/ToastContext";
+import { RxCross2 } from "react-icons/rx";
+import { Link } from "react-router-dom";
+import PrimaryButton from "../Common/PrimaryButton";
+import api from "../../utils/api";
 
-const ProfileSearch = ({ searchdata, showsearch, setShowsearch }) => {
-  const data = searchdata || [];
+const ProfileSearch = ({ searchdata, showsearch, setShowsearch, refreshData }) => {
   const { user } = useAuth0();
-  // ${SERVER_URL}/profile/follow
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const { showToast } = useToast();
 
-  const followMe = async (eml) => {
-    const res = await fetch(`${SERVER_URL}/profile/follow`, {
-      method: "POST",
-      body: JSON.stringify({ from:user.email , to:eml }),
-      headers: {
-        "Content-type": "application/json; charset=UTF-8",
-      },
-    });
-    console.log(res)
-  }
+  const followMe = async (targetEmail, name) => {
+    if (!user?.email) return;
 
-  
+    setIsActionLoading(true);
+    try {
+      await api.post("/profile/follow", { from: user.email, to: targetEmail });
 
-
-  const check = (ele) => {
-    const arr = ele.Profile.Followers || [];
-
-    const data = arr.find((fll) => fll === user.email) || [];
-
-    if (data.length) {
-      return true;
+      showToast(`Following ${name}`, "green");
+      if (refreshData) refreshData();
+    } catch (err) {
+      console.error("Follow Error:", err);
+      showToast(`Failed to follow ${name}`, "red");
+    } finally {
+      setIsActionLoading(false);
     }
-    return false;
   };
 
-  // console.log(searchdata);
-  console.log(data);
+  const isFollowing = (searchedUser) => {
+    const followers = searchedUser?.Profile?.Followers || [];
+    return followers.includes(user?.email);
+  };
+
+  const data = searchdata || [];
 
   return (
-    <div className=" rounded-2xl bg-[#050618] h-[400px] w-[400px] p-2 overflow-scroll no-scrollbar ">
-      <div className="sticky bg-[#050618] top-0 mb-3 z-10  pb-2">
-        <div className="text-white font-semibold text-[24px] flex justify-between items-center ">
-          <div className="opacity-0">Followers</div>
-          <RxCross2
-            onClick={() => {
-              setShowsearch(!showsearch);
-            }}
-          />
+    <div className="rounded-3xl bg-[#050618]/95 border border-[#0CA3E7]/20 max-h-[500px] w-[400px] flex flex-col shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in duration-300 overflow-hidden">
+      <div className="p-6 pb-2">
+        <div className="text-white font-bold text-2xl flex justify-between items-center mb-4">
+          <span>Search Results</span>
+          <button 
+            onClick={() => setShowsearch(false)}
+            className="p-1 hover:bg-white/10 rounded-full transition-colors text-gray-500 hover:text-white"
+          >
+            <RxCross2 size={24} />
+          </button>
         </div>
-        <hr className=" opacity-65 mt-2 sticky "></hr>
-        {/* <div className='mt-6 relative' >
-            <input className=' text-white w-[100%] py-4 px-14 rounded-lg bg-[#0ca2e749]' ></input>
-            <img className='absolute top-4 left-4' src={SearchIcon} alt="" />
-        </div> */}
+        <div className="h-px bg-white/5 w-full"></div>
       </div>
 
-      <div>
-        {!data && (
-          <div className="w-[100%] h-[700px] flex justify-center items-center ">
-            <ProgressSpinner
-              style={{ width: "50px", height: "50px" }}
-              strokeWidth="8"
-              fill="#05081B"
-              animationDuration=".5s"
-            />
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6 pt-2">
+        {data.length === 0 ? (
+          <div className="h-40 flex flex-col items-center justify-center text-gray-600 italic">
+            No matching profiles found
           </div>
-        )}
-        {
-          data.length == 0 && 
-          <div className="w-full text-center text-[24px] font-semibold " >
-            No one Found
-          </div>
-        }
-        {data.length != 0 && (
-          <div>
-            {data.map((ele, index) => {
-              return (
-                <div className="p-2 flex text-white justify-between border-b border-[#0ca2e749]">
-                  <Link to={`searchprofile/${ele._id}`}>
-                    <div className="flex justify-center items-center gap-2 ">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black text-white border-2 border-white overflow-hidden">
-                        <img src={ele.UserInfo.picture} alt="" />
-                      </span>
-                      <span>{ele.UserInfo.name}</span>
-                    </div>
-                  </Link> 
+        ) : (
+          <div className="space-y-4">
+            {data.map((profile, index) => (
+              <div key={profile._id || index} className="p-4 flex items-center justify-between bg-white/5 border border-white/5 rounded-2xl hover:border-[#0CA3E7]/30 transition-all group">
+                <Link to={`/homepage/profile/${profile._id}`} className="flex items-center gap-4 flex-1">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/10 shadow-lg group-hover:border-[#0CA3E7]/50 transition-colors">
+                    <img src={profile.UserInfo?.picture} alt={profile.UserInfo?.name} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-bold text-gray-100 group-hover:text-[#0CA3E7] transition-colors">{profile.UserInfo?.name}</span>
+                    <span className="text-[10px] text-gray-500 uppercase tracking-widest">{profile.Profile?.Title || "Developer"}</span>
+                  </div>
+                </Link>
 
-                  {check(ele) && (
-                    <div className='border-2 border-[#E0E0E0] border-opacity-15  text-[#11111] text-[12px] min-w-fit rounded-full mb-1 py-1 px-6 bg-gradient-to-b from-[#18203E] to-[#172748] ' >Following</div>
-                  )}
-                  {!check(ele) && (
-                    <div className='border-2 border-[#E0E0E0] border-opacity-15  text-[#11111] text-[12px] min-w-fit rounded-full mb-1 py-1 px-6 bg-gradient-to-b from-[#18203E] to-[#172748] ' >Not Following</div>
-                  )}
-                </div>
-              );
-            })}
+                {isFollowing(profile) ? (
+                  <div className="px-5 py-2 text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] bg-[#0CA3E7]/10 border border-[#0CA3E7]/30 rounded-full">
+                    Following
+                  </div>
+                ) : (
+                  <PrimaryButton
+                    label="Follow"
+                    onClick={() => followMe(profile.UserInfo?.email, profile.UserInfo?.name)}
+                    isLoading={isActionLoading}
+                    variant="primary"
+                    className="!px-6 !py-2 !text-[10px] border-none"
+                  />
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
-
-      {/* <div className="p-2 flex text-white justify-between border-b border-[#0ca2e749]">
-        <div className="flex justify-center items-center gap-2 ">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-black text-white border-2 border-white">
-            A
-          </span>
-          <span>Ankit Chauhan</span>
-        </div>
-        <GradientBtn className="text-white" placeholder="Remove" />
-      </div> */}
     </div>
   );
 };

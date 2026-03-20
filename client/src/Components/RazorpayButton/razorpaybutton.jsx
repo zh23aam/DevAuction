@@ -1,5 +1,5 @@
-import React from 'react'
-import SERVER_URL from '../../contants.mjs'
+import api from '../../utils/api';
+import { RAZORPAY_KEY_ID } from '../../utils/constants';
 
 function RazorpayButton() {
 
@@ -15,24 +15,17 @@ function RazorpayButton() {
   {
     const amount = 100
     try {
-      const response = await fetch(`${SERVER_URL}/payments`, {
-        method: "POST", 
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({amount : amount}),
-      });
-  
-      const result = await response.json();
+      const result = await api.post("/payments", { amount });
+      console.log("Success:", result);
       console.log("Success:", result);
 
       if(response.ok)
       {
           var options = {
-              "key_id" : "rzp_test_w1PnHafmCNsrDy", 
+              "key" : RAZORPAY_KEY_ID, 
               "amount": `${result.amount}`, 
               "currency": "INR",
-              "name": "Acme Corp",
+              "name": "DevAuction",
               "description": "Test Transaction",
               "image": "https://example.com/your_logo",
               "order_id": `${result.id}`, 

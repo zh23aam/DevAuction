@@ -3,7 +3,12 @@ const fs = require('fs')
 const {google} = require('googleapis')
 const multer = require('multer')
 const path = require('path')
-const {client_email,private_key} = require('../../constants')
+const {
+    GOOGLE_DRIVE_FOLDER_ID,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_REFRESH_TOKEN
+} = require('../../constants')
 const Room = require('../models/createRoom')
 const crypto = require('crypto')
 const Project = require('../models/project')
@@ -14,45 +19,78 @@ const router = express.Router()
 
 const SCOPE = ['https://www.googleapis.com/auth/drive']
 
-async function authorize(){
-    const jwtClient = new google.auth.JWT(
-        client_email,
-        null,
-        private_key,
-        SCOPE
+async function authorize() {
+    if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REFRESH_TOKEN) {
+        logger.error('[GOOGLE-DRIVE] Missing OAuth2 credentials (Client ID, Secret, or Refresh Token)');
+        throw new Error('OAuth2 credentials not configured');
+    }
+
+    const oauth2Client = new google.auth.OAuth2(
+        GOOGLE_CLIENT_ID,
+        GOOGLE_CLIENT_SECRET,
+        'https://developers.google.com/oauthplayground' // Default redirect URI for playground or your app's redirect URI
     );
 
-    await jwtClient.authorize()
+    oauth2Client.setCredentials({
+        refresh_token: GOOGLE_REFRESH_TOKEN
+    });
 
-    return jwtClient
+    return oauth2Client;
 }
 
-let filename = ""
 
-async function uploadFile(authClient){
-    return new Promise((resolve,rejected)=>{
-        const drive = google.drive({version:'v3',auth:authClient})
-        const filepath = `./public/temp/${filename}`
+async function uploadFile(authClient, filename) {
+    const drive = google.drive({ version: 'v3', auth: authClient });
+    const filepath = `./public/temp/${filename}`;
 
-        var fileMetaData = {
-            name:filename,    
-            parents:['1fnkhuzv-8GbO88pL4sPYieJ9Ciaw096l'] 
+    if (!fs.existsSync(filepath)) {
+        logger.error(`[GOOGLE-DRIVE] File not found on local disk: ${filepath}`);
+        throw new Error(`Local file not found: ${filepath}`);
+    }
+
+    const createWithFolder = async (folderId) => {
+        const requestBody = {
+            name: filename,
+            mimeType: 'application/zip'
+        };
+        if (folderId) {
+            requestBody.parents = [folderId];
         }
 
-        drive.files.create({
-            resource:fileMetaData,
-            media:{
-                body: fs.createReadStream(filepath), 
-                mimeType:'application/zip'
+        logger.info(`[GOOGLE-DRIVE] Creating file on Drive. Parent: ${folderId || 'root'}`);
+        return drive.files.create({
+            requestBody: requestBody,
+            media: {
+                body: fs.createReadStream(filepath),
+                mimeType: 'application/zip'
             },
-            fields:'id'
-        },function(error,file){
-            if(error){
-                return rejected(error)
+            fields: 'id'
+        });
+    };
+
+    try {
+        const targetFolder = GOOGLE_DRIVE_FOLDER_ID || '1fnkhuzv-8GbO88pL4sPYieJ9Ciaw096l';
+        const response = await createWithFolder(targetFolder);
+        logger.info(`[GOOGLE-DRIVE] Upload successful. File ID: ${response.data.id}`);
+        return response;
+    } catch (error) {
+        const errorMsg = error.message || (error.response && error.response.data && error.response.data.error && error.response.data.error.message) || "";
+        logger.error(`[GOOGLE-DRIVE] Primary upload attempt failed: ${errorMsg}`, { status: error.status, data: error.response?.data });
+
+        if (errorMsg.includes('File not found') || error.status === 404) {
+            logger.warn(`[GOOGLE-DRIVE] Target folder invalid or inaccessible. Retrying upload to root.`);
+            try {
+                const response = await createWithFolder(null);
+                logger.info(`[GOOGLE-DRIVE] Fallback upload successful. File ID: ${response.data.id}`);
+                return response;
+            } catch (retryError) {
+                const retryErrorMsg = retryError.message || (retryError.response && retryError.response.data && retryError.response.data.error && retryError.response.data.error.message) || "";
+                logger.error(`[GOOGLE-DRIVE] Fallback upload failed: ${retryErrorMsg}`);
+                throw retryError;
             }
-            resolve(file)
-        })
-    })
+        }
+        throw error;
+    }
 }
 
 async function downloadFile(fileId) {
@@ -65,14 +103,14 @@ async function downloadFile(fileId) {
     
         response.data
             .on('end', () => {
-            console.log('File downloaded successfully!')
+            logger.info('File downloaded successfully!')
             })
             .on('error', (err) => {
-            console.error('Error downloading file:', err)
+            logger.error('Error downloading file:', err)
             })
             .pipe(dest);
     } catch (err) {
-        console.error('Error downloading file:', err)
+        logger.error('Error downloading file:', err)
     }
 }
 
@@ -99,41 +137,49 @@ router.post('/project', upload.single("file"), async (req,res)=>{
     logger.info(`[CREATE-PROJECT] Attempting to create project: ${title} by ${email}`)
 
     try{
-        filename = req.file.filename
-        const fileuploadResponse = await authorize().then(uploadFile).catch(err => {
+        const currentFilename = req.file.filename
+        const fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename)).catch(err => {
             logger.error(`[CREATE-PROJECT] Google Drive upload error for ${title}: `, err)
             throw err
         })
         const project_id = generateUniqueHexId()
-        
-        const {Owner, Image, Title,Status, Description, Tags,FileID, Link, ProjectID,OfferPrice} = {
-            Owner : email,
-            Image : req.body.image,
-            Title : title,
-            Status : Boolean(false),
-            Description: req.body.description,
-            Tags : req.body.tags,
-            FileID : fileuploadResponse.data.id,
-            Link : req.body.link,
-            OfferPrice : req.body.offerPrice,
-            ProjectID : project_id
+        let parsedTags = []
+        try {
+            const rawTags = req.body.tags || req.body.skills
+            if (rawTags) {
+                parsedTags = typeof rawTags === 'string' ? JSON.parse(rawTags) : rawTags
+            }
+        } catch (e) {
+            logger.warn(`[CREATE-PROJECT] Error parsing tags: ${e.message}`)
+            parsedTags = []
         }
 
+        const Owner = email
+        const Image = req.body.image
+        const Title = title
+        const Status = Boolean(false)
+        const Description = req.body.description
+        const Category = req.body.category
+        const Tags = parsedTags
+        const FileID = fileuploadResponse.data.id
+        const Link = req.body.link
+        const OfferPrice = Number(req.body.offerPrice)
+        const ProjectID = project_id
 
-        if (!Owner || !Image || !Title || !Description || !FileID || !Link || !OfferPrice || !ProjectID) {
+        if (!Owner || !Title || !Description || !FileID || !OfferPrice || !ProjectID) {
             logger.warn(`[CREATE-PROJECT] Missing required fields for project: ${title}`)
             return res.status(400).json({ message: 'Please fill in all required fields' })
         }
         else{
-            const newProject = new Project({Owner, Image, Title, Description, Status, Tags, FileID, Link, ProjectID, OfferPrice, Offers : [], Sold : {}})
+            const newProject = new Project({Owner, Image, Title, Description, Status, Tags, Category, FileID, Link, ProjectID, OfferPrice, Offers : [], Sold : {}})
             await newProject.save()
             logger.info(`[CREATE-PROJECT] Project document saved: ${project_id}`)
 
-            fs.unlink(`./public/temp/${filename}`, (err) => {
+            fs.unlink(`./public/temp/${currentFilename}`, (err) => {
                 if (err) {
-                    logger.error(`[CREATE-PROJECT] Error deleting temp file ${filename}: `, err)
+                    logger.error(`[CREATE-PROJECT] Error deleting temp file ${currentFilename}: `, err)
                 } else {
-                    logger.info(`[CREATE-PROJECT] Temp file deleted: ${filename}`)
+                    logger.info(`[CREATE-PROJECT] Temp file deleted: ${currentFilename}`)
                 }
             })
 
@@ -163,8 +209,11 @@ router.post('/project', upload.single("file"), async (req,res)=>{
 
 router.post("/room", upload.single("file"), async (req,res)=>{
     try{
-        filename = req.file.filename
-        const fileuploadResponse = await authorize().then(uploadFile).catch("error",console.error())
+        const currentFilename = req.file.filename
+        const fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename)).catch(err => {
+            logger.error(`[CREATE-ROOM] Google Drive upload error for room: `, err)
+            throw err
+        })
         const room_id = generateUniqueHexId()
 
         const {Owner ,Image,Status,Time,Title,Description,FileID, RoomID} = {
@@ -184,13 +233,13 @@ router.post("/room", upload.single("file"), async (req,res)=>{
         }else{
             const newRoom = new Room({Owner ,Image,Time,Title,Status,Description,FileID, RoomID, Bids : [], Sold : {}})
             await newRoom.save()
-            console.log("Room created successfully")
+            logger.info("Room created successfully")
 
-            fs.unlink(`./public/temp/${filename}`, (err) => {
+            fs.unlink(`./public/temp/${currentFilename}`, (err) => {
                 if (err) {
-                    console.error(err)
+                    logger.error(`[CREATE-ROOM] Error deleting temp file ${currentFilename}: `, err)
                 } else {
-                    console.log('File deleted successfully!')
+                    logger.info('File deleted successfully!')
                 }
             })
 
@@ -213,14 +262,14 @@ router.post("/room", upload.single("file"), async (req,res)=>{
 
 router.post("/download",async(req, res) => {
     const fileID = req.body.fileID 
-    console.log(fileID)
+    logger.info(`[DOWNLOAD] Attempting download for FileID: ${fileID}`)
     try{
-        await downloadFile(fileID).catch(console.error)
+        await downloadFile(fileID).catch(err => logger.error(`[DOWNLOAD] Error in downloadFile: `, err))
 
         res.redirect("https://devauction.onrender.com/create/sendfile")
 
     }catch(error){
-        console.log(error)
+        logger.error(`[DOWNLOAD] Unexpected error: `, error)
     }
 })
 
@@ -236,23 +285,23 @@ router.get("/sendfile",async(req, res) => {
             
             res.sendFile(filepath, (err) => {
                 if (err) {
-                  console.error('Error sending file:', err)
+                  logger.error('Error sending file:', err)
                   res.status(500).send('Error sending file')
                   return
                 }
           
                 fs.unlink("./public/downloads/sourcecode.zip", (err) => {
                     if (err) {
-                        console.error(err);
+                        logger.error(err);
                     } else {
-                        console.log('File deleted successfully!');
+                        logger.info('File deleted successfully!');
                     }
                 })
             })
         })
 
     }catch(error){
-        console.log(error)
+        logger.error(error)
     }
 })
 

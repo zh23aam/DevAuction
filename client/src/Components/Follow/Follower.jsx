@@ -1,116 +1,128 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SearchIcon from "../../assets/GalleryImages/search 02.png";
 import { RxCross2 } from "react-icons/rx";
 import "./Follow.css";
 import GradientBtn from "../Buttons/GradientBtn";
 import { useAuth0 } from "@auth0/auth0-react";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+import { ProgressSpinner } from "primereact/progressspinner";
+import EmptyState from "../Common/EmptyState";
+import { useToast } from "../../context/ToastContext";
+import profileImg from "../../assets/images/avatar-default-svgrepo-com.svg";
 
-const Follower = ({resp, Data, showFollow, setShowFollow }) => {
+const Follower = ({ resp, Data, showFollow, setShowFollow }) => {
   const { user } = useAuth0();
+  const { showToast } = useToast();
+  const [followers, setFollowers] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
 
-  const [data, setdata] = useState([]);
-  const arr = data || [];
-  const [search,setSearch] = useState('') ; 
+  const fetchFollowers = useCallback(async () => {
+    const followerList = Data?.userData?.Profile?.Followers || [];
+    if (followerList.length === 0) {
+      setFollowers([]);
+      return;
+    }
 
-  const follow = Data.userData.Profile.Followers || [];
-  const response = async () => {
-    const res = await fetch(
-      `${SERVER_URL}/profile/followers`,
-      {
-        method: "POST",
-        body: JSON.stringify({ followers: follow }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
-      }
-    );
-    const newdata = await res.json();
-    console.log(newdata.data);
-    setdata(newdata.data);
-  };
-
-  const [to,setto] = useState('');
-
-  const unfollowMe = async () => {
-
-    console.log(user.email) 
-    const res = await fetch(`${SERVER_URL}/profile/unFollow`, {
-      method: "POST",
-      body: JSON.stringify({
-        from: to,
-        to: user.email,
-      }),
-      headers: {
-        "Content-type": "application/json; charset=UTF-8",
-      },
-    });
-
-    console.log(res);
-    // setfollow(!follow);
-    resp();
-  };
+    setIsLoading(true);
+    try {
+      const result = await api.post("/profile/followers", { followers: followerList });
+      setFollowers(result.data || []);
+    } catch (err) {
+      console.error("Fetch Followers Error:", err);
+      showToast("Failed to load followers", "red");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [Data?.userData?.Profile?.Followers, showToast]);
 
   useEffect(() => {
-    response();
-  }, [Data]);
+    fetchFollowers();
+  }, [fetchFollowers]);
 
-  const clickhandler = (e) => {
-    if (e.key !== 'Enter') {
-        return;
-      }
-      console.log(search)
-    const newdata = data.find( (ele) => ele.name == search ) || []
-    console.log([newdata])
-    setdata([newdata]);
-  }
+  const removeFollower = async (followerEmail, name) => {
+    setIsActionLoading(true);
+    try {
+      await api.post("/profile/unFollow", {
+        from: followerEmail,
+        to: user.email,
+      });
+
+      showToast(`Removed ${name} from followers`, "blue");
+      if (resp) resp();
+    } catch (err) {
+      console.error("Remove Follower Error:", err);
+      showToast("Failed to remove follower", "red");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const filteredFollowers = followers.filter(f => 
+    f.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
-    <div className=" rounded-2xl bg-[#050618] h-[400px] w-[400px] p-2 overflow-scroll no-scrollbar ">
-      <div className="sticky bg-[#050618] top-0 mb-3 z-10  pb-2">
-        <div className="text-white font-semibold text-[24px] flex justify-between items-center ">
-          <div>Followers</div>
-          <RxCross2
-            onClick={() => {
-              setShowFollow(!showFollow);
-            }}
-          />
+    <div className="rounded-3xl bg-[#050618]/95 border border-[#0CA3E7]/20 h-[500px] w-[450px] flex flex-col shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in duration-300">
+      <div className="p-6 pb-2">
+        <div className="text-white font-bold text-2xl flex justify-between items-center mb-4">
+          <span>Followers</span>
+          <button 
+            onClick={() => setShowFollow(false)}
+            className="p-1 hover:bg-white/10 rounded-full transition-colors text-gray-500 hover:text-white"
+          >
+            <RxCross2 size={24} />
+          </button>
         </div>
-        <hr className=" opacity-65 mt-2 sticky "></hr>
-        <div className="mt-6 relative">
+        
+        <div className="relative group">
           <input 
-          value={search}
-          className=" text-white w-[100%] py-4 px-14 rounded-lg bg-[#0ca2e749]" onChange={(e)=>{
-            setSearch(e.target.value)
-          }} onKeyDown={clickhandler} ></input>
-          <img className="absolute top-4 left-4" src={SearchIcon} alt="" />
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search followers..."
+            className="text-white w-full py-3 px-12 rounded-xl bg-[#0ca2e710] border border-white/5 focus:border-[#0ca2e740] outline-none transition-all placeholder:text-gray-600"
+          />
+          <img className="absolute top-1/2 -translate-y-1/2 left-4 w-5 h-5 opacity-40 group-focus-within:opacity-100 transition-opacity" src={SearchIcon} alt="" />
         </div>
       </div>
-      {
-        data.length == 0 && 
-        <div className="text-[24px]  font-semibold"  >
-            NO DATA FOUND
-        </div>
-      }
 
-      {data.map((ele) => {
-        return (
-          <div className="p-2 flex text-white justify-between border-b border-[#0ca2e749]">
-            <div className="flex justify-center items-center gap-2 ">
-              <span className="inline-flex items-center justify-center w-10 h-10 rounded-full overflow-hidden bg-black text-white border-2 border-white">
-                <img src={ele.image}></img>
-              </span>
-              <span>{ele.name}</span>
-            </div>
-            <GradientBtn className="text-white" placeholder="Remove" onClick={ () => { 
-                setto(ele.email)
-                unfollowMe(); 
-            }} />
+      <div className="flex-1 overflow-y-auto no-scrollbar p-6 pt-2">
+        {isLoading ? (
+          <div className="h-full flex flex-col items-center justify-center gap-4 text-gray-500">
+             <ProgressSpinner style={{width: '30px', height: '30px'}} strokeWidth="4" />
+             <p className="text-sm font-semibold tracking-widest uppercase">Fetching...</p>
           </div>
-        );
-      })}
+        ) : filteredFollowers.length === 0 ? (
+          <EmptyState 
+            size="sm"
+            icon="👥"
+            title={searchTerm ? "No match" : "No followers"}
+            description={searchTerm ? "Try a different name" : "You don't have any followers yet"}
+          />
+        ) : (
+          <div className="space-y-3">
+            {filteredFollowers.map((follower) => (
+              <div key={follower.email} className="p-3 flex items-center justify-between border-b border-white/5 hover:bg-white/5 rounded-xl transition-colors group">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white/10 shadow-lg group-hover:border-[#0CA3E7]/50 transition-colors">
+                    <img src={follower.image || profileImg} alt={follower.name} className="w-full h-full object-cover" />
+                  </div>
+                  <span className="font-semibold text-gray-200">{follower.name}</span>
+                </div>
+                <button 
+                  disabled={isActionLoading}
+                  onClick={() => removeFollower(follower.email, follower.name)}
+                  className="px-4 py-1 text-xs font-bold uppercase tracking-widest text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30 rounded-full transition-all active:scale-95 disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
-
 export default Follower;

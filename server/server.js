@@ -24,7 +24,11 @@ ConnectDB()
 
 // middlewares
 const app = express()
-app.use(express.json())
+app.use(express.json({
+    verify: (req, res, buf) => {
+        req.rawBody = buf.toString();
+    }
+}))
 
 // Enhanced request and response logging
 app.use(loggerMiddleware);

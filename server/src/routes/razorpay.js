@@ -45,7 +45,7 @@ router.post("/verify",async (req,res)=>{
     logger.info(`[RAZORPAY-VERIFY] Webhook received for ${email}, amount: ${amount}`)
 
     const shasum = crypto.createHmac("sha256", secret)
-    shasum.update(JSON.stringify(req.body))
+    shasum.update(req.rawBody)
     const digest = shasum.digest('hex')
 
     if(digest === req.headers["x-razorpay-signature"])

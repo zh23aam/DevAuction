@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import axios from 'axios';
+import api from '../../utils/api';
 
 const AudioRecorder = () => {
   const [mediaRecorder, setMediaRecorder] = useState(null);
@@ -52,22 +53,16 @@ const AudioRecorder = () => {
 
   const handleSendAudio = async () => {
     if (audioURL) {
-      const response = await fetch(audioURL);
-      const audioBlob = await response.blob();
+      // Use axios for local blob fetching to be consistent with "replace fetch with axios"
+      const { data: audioBlob } = await axios.get(audioURL, { responseType: 'blob' });
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.wav');
 
       try {
-        const res = await fetch('your_backend_endpoint', {
-          method: 'POST',
-          body: formData,
+        await api.post('/chat/audio', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
         });
-
-        if (res.ok) {
-          console.log('Audio sent successfully');
-        } else {
-          console.error('Failed to send audio');
-        }
+        console.log('Audio sent successfully');
       } catch (err) {
         console.error('Error sending audio:', err);
       }

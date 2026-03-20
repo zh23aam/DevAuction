@@ -29,11 +29,11 @@ export default function AuctionSteps({
           }
         >
           <div
-            className="accordianHeading flex items-center justify-between px-4 bg-gray-600 p-2 rounded-xl"
+            className="accordianHeading flex items-center justify-between px-6 py-3 bg-[#0D1F31] border border-[#223534] rounded-xl cursor-pointer active:scale-[0.98] transition-all"
             onClick={() => setShowMore(!showMore)}
           >
-            Elaborate{" "}
-            <IoIosArrowDown className={`${showMore ? "rotate-180" : ""}`} />
+            <span className="text-sm font-semibold tracking-wide uppercase">Learn More</span>
+            <IoIosArrowDown className={`text-xl transition-transform duration-500 ${showMore ? "rotate-180" : ""}`} />
           </div>
           <div className="tagline border-2 border-gray-400 text-gray-300  p-2 rounded-xl w-fit max-w-full text-center bg-gradient-to-b from-[#061B30] to-[#051022]">
             "{tagline}"

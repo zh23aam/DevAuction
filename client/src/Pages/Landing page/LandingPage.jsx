@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Hero from "../../Components/HomePageHero/HomePageHero";
 import NavBar from "../../Components/NavBar/NavBar";
 import FeatureSection from "../../Components/Featues section/FeaturesSection";
@@ -11,44 +11,35 @@ import ContactUs from "../../Components/Home page footer/ContactUs";
 import { useNavigate } from "react-router-dom";
 import { ProgressSpinner } from "primereact/progressspinner";
 import star from "../../assets/Icons/star.svg";
-import CustomToast from "../../Components/Custom Toast/CustomToast";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+import { useToast } from "../../context/ToastContext";
 
 function Home() {
-  const [showToast, setShowToast] = useState(false);
-  const [toastDetails, setToastDetails] = useState({});
+  const { showToast } = useToast();
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading, loginWithRedirect, logout } =
     useAuth0();
 
-  function displayToast(msg, type) {
-    setToastDetails((PrevState) => {
-      return { msg, type };
-    });
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 5000);
-  }
-  console.log(isAuthenticated);
-  if (isAuthenticated) {
-    console.log(user);
-    console.log(isAuthenticated);
-    if (user.email_verified) {
-      const response = fetch(`${SERVER_URL}/auth`, {
-        method: "POST",
-        body: JSON.stringify(user),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
-      });
-
-      navigate("/homepage/dashboard");
-    } else {
-      displayToast("Enter a valid email address!");
+  const handleAuth = async () => {
+    if (isAuthenticated && user?.email_verified) {
+      try {
+        await api.post("/auth", user);
+        navigate("/homepage/dashboard");
+      } catch (error) {
+        console.error("Auth Error:", error);
+        showToast("Authentication failed. Please try again.", "red");
+      }
+    } else if (isAuthenticated && !user?.email_verified) {
+      showToast("Please verify your email address first!", "red");
       logout({ logoutParams: { returnTo: window.location.origin } });
     }
-  }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      handleAuth();
+    }
+  }, [isAuthenticated, user]);
 
   return (
     <div className="HomePage bg-[#050618] text-white">
@@ -64,14 +55,6 @@ function Home() {
       )}
       {!isLoading && (
         <div className="relative">
-          <CustomToast
-            className={
-              showToast ? "right-10 opacity-100" : "-right-96 opacity-0"
-            }
-            msg={toastDetails.msg}
-            type={toastDetails.type}
-            setShowToast={setShowToast}
-          />
           <img
             src={star}
             className="absolute z-50 top-[35rem] scale-75 xl:block hidden"
@@ -104,7 +87,7 @@ function Home() {
           <FeatureSection />
           <OurMission />
           <Testimonials />
-          <ContactUs displayToast={displayToast} />
+          <ContactUs />
           <HomePageFooter />
         </div>
       )}

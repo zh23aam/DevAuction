@@ -22,7 +22,6 @@ export default function FeaturesSection() {
   return (
     <div id="features" className="overflow-hidden bg-[#050618] w-full h-fit">
       <Plx
-        className="bg-green-400"
         parallaxData={featureSectionParallax}
         style={{ width: "100%" }}
       >

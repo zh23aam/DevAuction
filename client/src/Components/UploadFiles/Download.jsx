@@ -1,17 +1,13 @@
 import React from 'react'
-import axios from 'axios'
 import { saveAs } from 'file-saver';
-import SERVER_URL from '../../contants.mjs';
+import { SERVER_URL } from "../../utils/constants";
+import api from '../../utils/api';
 
 function Download() {
   const downloadFile = async () => {
     try {
-
-      const response = await axios({
-        url : `${SERVER_URL}//uploads/download`,
-        method : "POST",
-        responseType : "blob",
-        data : {fileID : "1o4sDzcEHXsnG0Gvds0gs9-4iqO9rsEZ_"},
+      const response = await api.post("/uploads/download", { fileID: "1o4sDzcEHXsnG0Gvds0gs9-4iqO9rsEZ_" }, {
+        responseType: "blob"
       });
       console.log(response)
       

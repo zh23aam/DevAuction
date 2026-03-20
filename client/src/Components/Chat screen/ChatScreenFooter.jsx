@@ -9,13 +9,12 @@ import EmojiPicker from "emoji-picker-react";
 import CameraAccess from "./CameraAccess";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useSocket } from "../../context/SocketProvider";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
 
-const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, setMsgComps }) => {
+const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, onToggleProjectModal }) => {
   const socket = useSocket();
   const { user } = useAuth0();
   const [msg, setMsg] = useState("");
-  const [showAttachment, setShowAttachMent] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [openCamera, setOpenCamera] = useState(false);
   
@@ -23,13 +22,15 @@ const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, setMsgComps }) 
     setMsg((preMsg) => {
       return preMsg + emoji.emoji;
     });
-    // setShowEmojis(false);
   }
 
   const handleMessageRequest = (data) => {
     setMsgs(prevState => {
-      return {...prevState, senderMessages: [...prevState.senderMessages, data]}
-    })
+      return {
+        ...prevState, 
+        senderMessages: [...(prevState.senderMessages || []), data]
+      };
+    });
   };
 
   useEffect(() => {
@@ -40,8 +41,9 @@ const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, setMsgComps }) 
   }, [socket, handleMessageRequest]);
 
   async function sendMsg() {
+    if (!msg.trim()) return;
     const userEmail = user.email;
-    // console.log(userEmail, receiversMailId);
+    
     console.log("sending msg");
     socket.emit("user:message", {
       from: userEmail,
@@ -49,41 +51,27 @@ const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, setMsgComps }) 
       message: msg,
     });
 
-    const res = await fetch(
-      `${SERVER_URL}/profile/chat/send`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          from: userEmail,
-          to: receiversMailId,
-          message: msg,
-        }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
-      }
-    );
+    try {
+      await api.post("/profile/chat/send", {
+        from: userEmail,
+        to: receiversMailId,
+        message: msg,
+      });
 
-    const msgDeliveryResponse = await res.text();
-    setMsgs(prevState => {
-      return {...prevState, myMessages: [...prevState.myMessages, {mes: msg, at: new Date().getTime()}]};
-    })
-    setMsg(() => "");
-    console.log(msgDeliveryResponse);
+      setMsgs(prevState => {
+        return {
+          ...prevState, 
+          myMessages: [...(prevState.myMessages || []), { mes: msg, at: new Date().getTime() }]
+        };
+      });
+      setMsg("");
+    } catch (error) {
+      console.error("Send Message Error:", error);
+    }
   }
 
   return (
-    <div className="absolute bottom-4 flex gap-4 items-center w-[95%] left-1/2 max-w-full -translate-x-1/2">
-      {/* <AttachmentModel
-        className={
-          showAttachment ? " bottom-20 opacity-100" : " -bottom-80 opacity-0"
-        }
-      /> */}
-      {/* <CameraAccess
-        className=""
-        openCamera={openCamera}
-        setOpenCamera={setOpenCamera}
-      /> */}
+    <div className="flex gap-4 items-center w-full p-6 bg-white/[0.03] border-t border-white/5 relative z-10">
       <div
         className={
           "absolute md:right-20 bottom-20 right-0 " +
@@ -97,33 +85,32 @@ const ChatScreenFooter = React.memo(({ receiversMailId, setMsgs, setMsgComps }) 
         />
       </div>
       <div
-        className="msgInterface flex items-center p-4 rounded-xl flex-1 gap-4"
-        style={{ border: "1px solid rgba(255, 255, 255, 0.2)" }}
+        className="msgInterface flex items-center p-4 rounded-xl flex-1 gap-4 bg-[#05081B]/50 backdrop-blur-md"
+        style={{ border: "1px solid rgba(255, 255, 255, 0.1)" }}
       >
-        {/* <MdAttachment
+        <MdAttachment
           size="1.5rem"
-          className="rotate-[120deg] cursor-pointer active:bg-white active:text-gray-400 rounded-full"
+          className="rotate-[120deg] cursor-pointer hover:text-[#0CA3E7] transition-colors active:scale-95"
           onClick={() => {
             setShowEmojis(false);
-            setShowAttachMent(!showAttachment);
+            onToggleProjectModal();
           }}
-        /> */}
+        />
         <input
           type="text"
           className="w-full bg-inherit text-white h-fit outline-none"
           placeholder="Your thoughts here..."
           value={msg}
           onFocus={() => {
-            setShowAttachMent(false);
             setShowEmojis(false);
           }}
           onChange={(e) => setMsg(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && sendMsg()}
         />
         <MdOutlineEmojiEmotions
           size="1.5rem"
           className="cursor-pointer active:bg-white active:text-gray-400 rounded-full"
           onClick={() => {
-            setShowAttachMent(false);
             setShowEmojis(!showEmojis);
           }}
         />

@@ -4,10 +4,13 @@ import { ZegoUIKitPrebuilt } from "@zegocloud/zego-uikit-prebuilt";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useSocket } from "../../context/SocketProvider";
 import GradientBtn from "../../Components/Buttons/GradientBtn";
+import PrimaryButton from "../../Components/Common/PrimaryButton";
 import { IoIosArrowDown } from "react-icons/io";
 import { FaCoins } from "react-icons/fa";
-import CustomToast from "../../Components/Custom Toast/CustomToast";
-import SERVER_URL from "../../contants.mjs";
+import api from "../../utils/api";
+import { useToast } from "../../context/ToastContext";
+import { ZEGO_APP_ID, ZEGO_SERVER_SECRET } from "../../utils/constants";
+import { formatNumber } from "../../utils/helpers";
 
 const RoomPage = () => {
   // const zpInstance = useRef(null);
@@ -23,35 +26,13 @@ const RoomPage = () => {
   const [showAnimation, setShowAnimation] = useState(false);
   const videoContainerRef = useRef(null); // Add useRef for the video container
   const [host, setHost] = useState(false);
-  const [showToast, setShowToast] = useState(false);
-  const [toastDetails, setToastDetails] = useState({});
+  const { showToast } = useToast();
   const [zp, setZp] = useState(null); //related to zegocloud
 
   setTimeout(() => {
     setShowContent(true);
   }, 5000);
 
-  function displayToast(msg, type) {
-    setToastDetails((PrevState) => {
-      return { msg, type };
-    });
-    setShowToast(true);
-    setTimeout(() => {
-      setShowToast(false);
-    }, 5000);
-  }
-
-  function formatNumber(num) {
-    if (num >= 1000 && num < 1000000) {
-      return (num / 1000).toFixed(1).replace(/\.0$/, "") + "k";
-    } else if (num >= 1000000 && num < 1000000000) {
-      return (num / 1000000).toFixed(1).replace(/\.0$/, "") + "M";
-    } else if (num >= 1000000000) {
-      return (num / 1000000000).toFixed(1).replace(/\.0$/, "") + "B";
-    } else {
-      return num.toString();
-    }
-  }
 
   useEffect(() => {
     socket.emit("room:connect", {
@@ -64,14 +45,14 @@ const RoomPage = () => {
   }
 
   const myMeeting = async (element) => {
-    const appID = 246806963;
-    const serverSecret = "3d1a1e10260f5df79e25d531f57b171e";
+    const appID = ZEGO_APP_ID;
+    const serverSecret = ZEGO_SERVER_SECRET;
     const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
       appID,
       serverSecret,
       roomID,
       Date.now().toString(),
-      user.given_name
+      user.given_name || "User"
     );
     // Create instance object from Kit Token.
     const zp = ZegoUIKitPrebuilt.create(kitToken);
@@ -112,17 +93,11 @@ const RoomPage = () => {
     console.log(user.email);
     // let resData;
     try {
-      const res = await fetch(`${SERVER_URL}/rooms/getHost`, {
-        method: "POST",
-        body: JSON.stringify({
-          roomID,
-          email: user.email,
-        }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
+      const resData = await api.post("/rooms/getHost", {
+        roomID,
+        email: user.email,
       });
-      const resData = await res.json();
+
       console.log(resData);
       if (resData.Owner == user.email) {
         setHost(true);
@@ -136,17 +111,7 @@ const RoomPage = () => {
 
   async function getLatestBidAmount() {
     try {
-      const res = await fetch(
-        `${SERVER_URL}/rooms/getLatestBid`,
-        {
-          method: "POST",
-          body: JSON.stringify({ roomID }),
-          headers: {
-            "Content-type": "application/json; charset=UTF-8",
-          },
-        }
-      );
-      const resData = await res.json();
+      const resData = await api.post("/rooms/getLatestBid", { roomID });
       console.log(resData);
       setBidData(() => {
         return {
@@ -193,14 +158,10 @@ const RoomPage = () => {
     });
     socket.on("roomClose", (data) => {
       console.log(data);
-      fetch(`${SERVER_URL}/rooms/sendMailToBider`, {
-        method: "POST",
-        body: JSON.stringify({ roomID }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
+      api.post("/rooms/sendMailToBider", { roomID }).catch(err => {
+        console.error("Failed to send mail:", err);
       });
-      displayToast("Thankyou for joining", "green");
+      showToast("Thankyou for joining", "green");
       // console.log(zp);
       // navigate("/homepage/dashboard");
       navigate('/homepage/dashboard');
@@ -212,26 +173,18 @@ const RoomPage = () => {
       // }, 5000);
     });
     return () => {
-      socket.off("on:bid", (data) => {});
-      socket.off("roomClose", (data) => {});
+      socket.off("on:bid");
+      socket.off("roomClose");
     };
   }, [roomID, user]);
 
   async function SendBidToBackEnd() {
     try {
-      const res = await fetch(`${SERVER_URL}/rooms/bids`, {
-        method: "POST",
-        body: JSON.stringify({
-          roomId: roomID,
-          email: user.email,
-          bid: amount,
-        }),
-        headers: {
-          "Content-type": "application/json; charset=UTF-8",
-        },
+      await api.post("/rooms/bids", {
+        roomId: roomID,
+        email: user.email,
+        bid: amount,
       });
-      const kuchhToAya = await res.text();
-      console.log(kuchhToAya);
     } catch (error) {
       console.log(error);
     }
@@ -240,13 +193,13 @@ const RoomPage = () => {
   function SendBid() {
     if (bidData.data.Amt - amount >= 0) {
       speak("Your bid should be higher than previous bid!");
-      displayToast("Are thoda sharam karo (Bid amount should be greater than previous bid placed!)", "red");
+      showToast("Are thoda sharam karo (Bid amount should be greater than previous bid placed!)", "red");
       return;
     }
 
     if (amount - userCreditsLeft > 0) {
       speak("Your bid amount can't be more than your credits!");
-      displayToast("Your bid amount can't be more than your credits!", "red");
+      showToast("Your bid amount can't be more than your credits!", "red");
       return;
     }
 
@@ -280,94 +233,101 @@ const RoomPage = () => {
         className="video-container relative"
         style={{ height: "100%", width: "100%" }}
       />
-      <CustomToast
-        className={showToast ? "right-10 opacity-100" : "-right-96 opacity-0"}
-        msg={toastDetails.msg}
-        type={toastDetails.type}
-        setShowToast={setShowToast}
-      />
       {showContent && (
-        <div className="absolute z-[54545545] top-0  p-4 rounded-2xl flex gap-4 flex-wrap">
+        <div className="absolute z-50 top-6 left-6 flex flex-col sm:flex-row gap-6 items-start">
+          {/* Bid Control Section */}
           <div
-            className={`left shadow-2xl h-fit bg-white  rounded-xl transition-all duration-1000 relative ${
-              showBidSection ? "flex flex-col gap-4 items-center " : ""
+            className={`shadow-2xl h-fit bg-[#0f1325]/80 backdrop-blur-md rounded-2xl border border-white/10 transition-all duration-500 relative ${
+              showBidSection ? "flex flex-col gap-4 items-center w-[220px]" : "w-fit"
             }`}
-            style={{ padding: "0.5rem 1.5rem 0.5rem 1.5rem" }}
+            style={{ padding: showBidSection ? "1.5rem" : "0.5rem 2.5rem 0.5rem 1rem" }}
           >
             <IoIosArrowDown
-              className={`absolute right-4 top-5 transition-all duration-1000 cursor-pointer active:scale-95  ${
-                showBidSection ? "rotate-180" : ""
+              className={`absolute right-3 top-1/2 -translate-y-1/2 transition-all duration-500 cursor-pointer text-[#0CA3E7] hover:text-white ${
+                showBidSection ? "rotate-180 !top-5 !translate-y-0" : ""
               }`}
-              size="1.5rem"
+              size="1.2rem"
               onClick={() => setShowBidSection(!showBidSection)}
             />
+            
             <div
-              className={`z-[545454545] w-40 rounded-xl min-w-fit flex  items-center justify-center gap-2 bg-white transition-all duration-500  ${
+              className={`z-10 flex items-center justify-center gap-3 transition-all duration-500 ${
                 showAnimation ? "wiggleAnimation" : ""
-              } ${showBidSection ? "flex-col  text-white" : "text-black"}`}
-              style={
-                showBidSection
-                  ? {
-                      backgroundColor: "rgba(7, 38, 67, 1)",
-                      boxShadow:
-                        "0 2.93px 3.67px 1.47px rgba(121, 197, 239, 0.38)",
-                      paddingTop: "1rem",
-                    }
-                  : {}
-              }
+              } ${showBidSection ? "flex-col mb-2" : ""}`}
             >
-              <img
-                src={bidData?.data.img || user?.picture}
-                className="w-10 aspect-square rounded-full"
-                alt={bidData ? bidData?.data.name + "'s img" : ""}
-              />
-              <div className="bidAmt text-3xl font-bold min-w-fit">
-                &#8377; {bidData ? formatNumber(bidData?.data.Amt) : 0}
+              <div className="relative">
+                <img
+                  src={bidData?.data.img || user?.picture}
+                  className="w-10 h-10 rounded-full border border-[#0CA3E7]/40 p-0.5"
+                  alt={bidData ? bidData?.data.name + "'s img" : ""}
+                />
+                <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#0f1325] animate-pulse"></div>
               </div>
-              <div
-                className={`name text-xs pb-4 text-gray-400 transition-all duration-1000 ${
-                  showBidSection ? "" : "hidden"
-                }`}
-              >
-                {bidData ? bidData?.data.name : "Owner"}
+              
+              <div className="flex flex-col">
+                <div className="bidAmt text-2xl font-bold text-white tracking-tight flex items-center gap-1">
+                  <span className="text-[#0CA3E7] text-lg">₹</span>
+                  {bidData ? formatNumber(bidData?.data.Amt) : 0}
+                </div>
+                <div
+                  className={`name text-[10px] font-bold uppercase tracking-widest text-gray-500 transition-all duration-300 ${
+                    showBidSection ? "text-center mt-1" : "hidden sm:block"
+                  }`}
+                >
+                  {bidData ? bidData?.data.name : "Top Bidder"}
+                </div>
               </div>
             </div>
-            <input
-              type="number"
-              className={`rounded-xl p-2 outline-none bg-transparent text-white ${
-                showBidSection ? "" : "hidden"
-              }`}
-              placeholder="Bid amount"
-              value={amount}
-              onChange={handleInputChange}
-              style={{
-                backgroundColor: "rgba(7, 38, 67, 1)",
-                boxShadow: "0 2.93px 3.67px 1.47px rgba(121, 197, 239, 0.38)",
-              }}
-            />
-            <GradientBtn
-              onClick={SendBid}
-              className={`text-white ${showBidSection ? "" : "hidden"}`}
-              placeholder={"Bid"}
-            />
+
+            {showBidSection && (
+              <>
+                <div className="w-full flex flex-col gap-1.5 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] opacity-80 ml-1">Your Bid</label>
+                  <input
+                    type="number"
+                    className="rounded-xl px-4 py-2.5 outline-none bg-black/40 border border-white/10 text-white text-sm focus:border-[#0CA3E7]/40 focus:bg-black/60 transition-all shadow-inner w-full"
+                    placeholder="Min 100"
+                    value={amount}
+                    onChange={handleInputChange}
+                  />
+                </div>
+                <GradientBtn
+                  onClick={SendBid}
+                  className="w-full mt-2 animate-in fade-in slide-in-from-top-4 duration-500"
+                  placeholder={"Place Bid"}
+                />
+              </>
+            )}
           </div>
-          <div className="flex flex-col gap-4 items-center justify-center h-fit">
-            <button
-              className={`right bg-red-500  text-2xl rounded-xl font-bold text-white p-4 h-fit  ${
-                host ? "" : "hidden"
-              }`}
-              onClick={closeRoom}
-            >
-              End Auction
-            </button>
+
+          {/* Status & Credits Section */}
+          <div className="flex flex-col gap-4 items-center justify-center h-fit animate-in fade-in slide-in-from-left duration-700">
+            {host && (
+              <PrimaryButton
+                label="End Auction"
+                variant="danger"
+                onClick={closeRoom}
+                className="flex-col !gap-1 min-w-[100px] !rounded-2xl"
+                icon={() => (
+                  <div className="w-2 h-2 rounded-full bg-red-500 group-hover:bg-white animate-pulse mb-1"></div>
+                )}
+              />
+            )}
+            
             <div
-              className={`creditsLeft bg-white rounded-xl p-4 flex items-center gap-2 ${
-                Number(userCreditsLeft) >= 0 ? "text-black" : "text-red-500"
+              className={`creditsLeft bg-[#0f1325]/80 backdrop-blur-md border border-[#0CA3E7]/30 rounded-2xl p-4 flex flex-col items-center gap-1 min-w-[120px] shadow-2xl transition-all ${
+                Number(userCreditsLeft) <= 100 ? "border-red-500/50" : ""
               }`}
-              title="Your credits left"
+              title="Your remaining credits"
             >
-              <FaCoins size="1.2rem" />
-              {userCreditsLeft}
+              <div className="flex items-center gap-2 text-[#0CA3E7]">
+                <FaCoins size="0.9rem" />
+                <span className="text-[10px] font-bold uppercase tracking-widest opacity-80">Credits Left</span>
+              </div>
+              <span className={`text-xl font-bold ${Number(userCreditsLeft) <= 100 ? "text-red-400" : "text-white"}`}>
+                <span className="text-sm mr-1 opacity-60">₹</span>
+                {formatNumber(userCreditsLeft)}
+              </span>
             </div>
           </div>
         </div>
