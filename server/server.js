@@ -22,6 +22,14 @@ const galleryRouter = require("./src/routes/gallery")
 //mongodb connection
 ConnectDB()
 
+// Ensure required directories exist
+const fs = require('fs');
+const path = require('path');
+const tempDir = path.join(__dirname, 'public/temp');
+if (!fs.existsSync(tempDir)) {
+    fs.mkdirSync(tempDir, { recursive: true });
+}
+
 // middlewares
 const app = express()
 

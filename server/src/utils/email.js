@@ -6,7 +6,7 @@ const {EMAIL, APP_PASSWD} = require('../../constants')
 const transporter = nodemailer.createTransport({
     service : "gmail",
     host : "smtp.gmail.com",
-    post : 587,
+    port : 587,
     secure : false,
     auth: {
         user : EMAIL,

@@ -138,10 +138,23 @@ router.post('/project', upload.single("file"), async (req,res)=>{
 
     try{
         const currentFilename = req.file.filename
-        const fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename)).catch(err => {
+        const cleanup = () => {
+            const tempPath = path.join(__dirname, '../../public/temp', currentFilename);
+            fs.unlink(tempPath, (err) => {
+                if (err && err.code !== 'ENOENT') {
+                    logger.error(`[CREATE-PROJECT] Error deleting temp file ${currentFilename}: `, err)
+                }
+            })
+        }
+        
+        let fileuploadResponse;
+        try {
+            fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename))
+        } catch (err) {
             logger.error(`[CREATE-PROJECT] Google Drive upload error for ${title}: `, err)
+            cleanup()
             throw err
-        })
+        }
         const project_id = generateUniqueHexId()
         let parsedTags = []
         try {
@@ -174,14 +187,7 @@ router.post('/project', upload.single("file"), async (req,res)=>{
             const newProject = new Project({Owner, Image, Title, Description, Status, Tags, Category, FileID, Link, ProjectID, OfferPrice, Offers : [], Sold : {}})
             await newProject.save()
             logger.info(`[CREATE-PROJECT] Project document saved: ${project_id}`)
-
-            fs.unlink(`./public/temp/${currentFilename}`, (err) => {
-                if (err) {
-                    logger.error(`[CREATE-PROJECT] Error deleting temp file ${currentFilename}: `, err)
-                } else {
-                    logger.info(`[CREATE-PROJECT] Temp file deleted: ${currentFilename}`)
-                }
-            })
+            cleanup()
 
             const user = await User.findOneAndUpdate({"UserInfo.email" : email},{ 
                 $push : {
