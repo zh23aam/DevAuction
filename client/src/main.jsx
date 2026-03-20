@@ -4,6 +4,7 @@ import App from './App.jsx'
 import './index.css'
 import { Auth0Provider } from '@auth0/auth0-react'
 import { PrimeReactProvider } from 'primereact/api'
+import { SocketProvider } from "./context/SocketProvider.jsx"
 import { AUTH0_DOMAIN, AUTH0_CLIENT_ID } from "./utils/constants.js"
 
 ReactDOM.createRoot(document.getElementById('root')).render(
