@@ -20,8 +20,8 @@ router.post("/", async (req, res) => {
       const existingUser = await User.findOne({ "UserInfo.email": email });
 
       if (existingUser) {
-        console.log("Email already exists in the database.");
-        return res.status(409).json({ message: "Email already exists" });
+        console.log("User already exists. Proceeding with login.");
+        return res.status(200).json({ message: "Login successful" });
       } else {
         try {
           const newUser = new User({
