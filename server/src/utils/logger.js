@@ -27,27 +27,31 @@ const logger = winston.createLogger({
   format: logFormat,
   defaultMeta: { service: 'dev-auction-server' },
   transports: [
-    new winston.transports.File({ 
+    new winston.transports.Console({
+      format: consoleFormat,
+    }),
+  ],
+});
+
+// Only add file transports in non-production or if logs directory exists
+if (process.env.NODE_ENV !== 'production') {
+  try {
+    logger.add(new winston.transports.File({ 
       filename: path.join(__dirname, '../../logs/error.log'), 
       level: 'error',
       maxsize: 5242880, // 5MB
       maxFiles: 5,
       format: fileFormat
-    }),
-    new winston.transports.File({ 
+    }));
+    logger.add(new winston.transports.File({ 
       filename: path.join(__dirname, '../../logs/combined.log'),
       maxsize: 5242880, // 5MB
       maxFiles: 5,
       format: fileFormat
-    }),
-  ],
-});
-
-if (process.env.NODE_ENV !== 'production') {
-  logger.add(new winston.transports.Console({
-    format: consoleFormat,
-    level: 'debug',
-  }));
+    }));
+  } catch (err) {
+    console.warn("Could not initialize file logging:", err.message);
+  }
 }
 
 module.exports = logger;
