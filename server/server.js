@@ -5,7 +5,7 @@ const {Server} = require('socket.io')
 const logger = require('./src/utils/logger')
 const loggerMiddleware = require('./src/middlewares/loggerMiddleware')
 const ConnectDB = require('./src/db/connection')
-const {PORT} = require('./constants')
+const {PORT, CORS_ORIGIN} = require('./constants')
 
 const cleanupJob = require('./src/utils/cleanupcode')
 const contactRouter = require('./src/routes/contactusRoutes')
@@ -24,6 +24,28 @@ ConnectDB()
 
 // middlewares
 const app = express()
+
+// Move CORS to the very top
+const allowedOrigins = [
+    "https://dev-auction-harsh.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    CORS_ORIGIN
+].filter(Boolean);
+
+app.use(cors({
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
 app.use(express.json({
     verify: (req, res, buf) => {
         req.rawBody = buf.toString();
@@ -33,14 +55,12 @@ app.use(express.json({
 // Enhanced request and response logging
 app.use(loggerMiddleware);
 
-// cors
-app.use(cors({origin : true}))
-
 // socket.io server
 const server = createServer(app)
 const io = new Server(server, {
     cors : {
-        origin : true
+        origin : allowedOrigins,
+        credentials: true
     }
 })
 
