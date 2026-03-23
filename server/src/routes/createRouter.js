@@ -4,7 +4,7 @@ const {google} = require('googleapis')
 const multer = require('multer')
 const path = require('path')
 const {
-    GOOGLE_REFRESH_TOKEN
+    GOOGLE_REFRESH_TOKEN, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_DRIVE_FOLDER_ID
 } = require('../../constants')
 const Room = require('../models/createRoom')
 const crypto = require('crypto')
