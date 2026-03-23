@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth0 } from "@auth0/auth0-react";
 import GradientBtn from "../Buttons/GradientBtn";
@@ -16,6 +16,11 @@ const Createauction = ({ show, setshow }) => {
   const { user } = useAuth0();
   const [isLoading, setIsLoading] = useState(false);
   const fileref = useRef(null);
+  
+  const [userProjects, setUserProjects] = useState([]);
+  const [isNewProject, setIsNewProject] = useState(true);
+  const [selectedProject, setSelectedProject] = useState(null);
+
   const [url, seturl] = useState("");
   const [title, settitle] = useState("");
   const [date, setDate] = useState("");
@@ -23,11 +28,40 @@ const Createauction = ({ show, setshow }) => {
   const [fileName, setFileName] = useState("Upload Source Code");
   const { showToast } = useToast();
 
+  useEffect(() => {
+    const fetchProjects = async () => {
+      if (!user?.email) return;
+      try {
+        const response = await api.post("/profile/userProjects", { email: user.email });
+        setUserProjects(response.userProjects || []);
+      } catch (error) {
+        console.error("Error fetching projects:", error);
+      }
+    };
+    fetchProjects();
+  }, [user]);
+
+  const handleProjectSelect = (e) => {
+    const project = e.value;
+    setSelectedProject(project);
+    if (project) {
+      settitle(project.Title);
+      seturl(project.Image || "");
+      setdesc(project.Description);
+      setFileName("Source Code Linked");
+    } else {
+      settitle("");
+      seturl("");
+      setdesc("");
+      setFileName("Upload Source Code");
+    }
+  };
+
   const handleFileChange = (e) => {
     if (e.target.files[0]) {
       setFileName(e.target.files[0].name);
     } else {
-      setFileName("Upload Source Code");
+      setFileName(isNewProject ? "Upload Source Code" : "Source Code Linked");
     }
   };
 
@@ -39,14 +73,20 @@ const Createauction = ({ show, setshow }) => {
       return;
     }
 
-    if (!fileref.current.files[0]) {
+    if (isNewProject && !fileref.current.files[0]) {
       showToast("Please upload source code file", "red");
       return;
     }
 
     setIsLoading(true);
     const formData = new FormData();
-    formData.append("file", fileref.current.files[0]);
+    
+    if (fileref.current?.files[0]) {
+      formData.append("file", fileref.current.files[0]);
+    } else if (selectedProject) {
+      formData.append("fileID", selectedProject.FileID);
+    }
+
     formData.append("date", date);
     formData.append("title", title);
     formData.append("description", desc);
@@ -66,7 +106,7 @@ const Createauction = ({ show, setshow }) => {
       
       showToast("Auction room created successfully!", "green");
       setshow(false);
-      navigate(`/room/${response.RoomID}`);
+      navigate(`/auction/${response.RoomID}`);
     } catch (error) {
       console.error("Create Room Error:", error);
       showToast(error.message || "Failed to create room", "red");
@@ -83,6 +123,22 @@ const Createauction = ({ show, setshow }) => {
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  const projectOptionTemplate = (option) => {
+    return (
+      <div className="flex items-center gap-3 p-1">
+        <img 
+          src={option.Image || "https://via.placeholder.com/40"} 
+          alt={option.Title} 
+          className="w-8 h-8 rounded-md object-cover border border-white/10"
+        />
+        <div className="flex flex-col">
+          <span className="text-white text-xs font-semibold">{option.Title}</span>
+          <span className="text-gray-400 text-[10px]">{option.Category || "Project"}</span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex justify-center items-center relative max-w-[calc(100vw-2rem)] md:max-w-3xl w-full max-h-[90vh] overflow-y-auto no-scrollbar z-10 rounded-3xl shadow-2xl bg-[#0f1325]/95 border border-[#0CA3E7]/20 p-4 animate-in fade-in zoom-in duration-300">
       <button 
@@ -96,45 +152,80 @@ const Createauction = ({ show, setshow }) => {
         <h2 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent tracking-tight">Create Auction</h2>
 
         <div className="w-full space-y-4">
-          <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/30 border border-[#0CA3E7]/10 group focus-within:border-[#0CA3E7]/40 transition-all">
-            <div className="flex items-center justify-between mb-2">
-              <label htmlFor="url" className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] opacity-80">Image or video URL (Optional)</label>
-              <GoQuestion
-                size="1.1rem"
-                className="cursor-pointer text-[#0CA3E7] hover:text-white transition-all"
-                onClick={() => setShowVideo(!showVideo)}
-              />
-            </div>
-            {showVideo && (
-              <div className="absolute left-1/2 -translate-x-1/2 h-64 aspect-video z-50 top-10 max-w-[80vw] bg-black rounded-lg border border-[#0CA3E7]/20 shadow-2xl overflow-hidden animate-in zoom-in">
-                {/* video component here if needed, or link */}
-                <RxCross2
-                  className="absolute top-2 right-2 text-white hover:text-red-500 z-[80] cursor-pointer"
-                  onClick={() => setShowVideo(false)}
-                />
-              </div>
-            )}
-            <input
-              id="url"
-              value={url}
-              onChange={(e) => seturl(e.target.value)}
-              placeholder="https://example.com/image.jpg"
-              className="bg-black/20 focus:bg-black/30 transition-all rounded-xl px-4 py-2.5 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white text-sm"
-              disabled={isLoading}
-            />
+          {/* Project Type Selection */}
+          <div className="flex gap-4 p-1 bg-black/20 rounded-xl border border-white/5 w-fit">
+            <button
+              type="button"
+              onClick={() => { setIsNewProject(true); setSelectedProject(null); }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${isNewProject ? 'bg-[#0CA3E7] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              NEW PROJECT
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsNewProject(false)}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${!isNewProject ? 'bg-[#0CA3E7] text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              EXISTING PROJECT
+            </button>
           </div>
 
-          <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5 focus-within:border-[#0CA3E7]/40 transition-all">
-            <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">Project Title*</label>
-            <input
-              value={title}
-              onChange={(e) => settitle(e.target.value)}
-              placeholder="E.g., Modern E-commerce Platform"
-              className="bg-black/20 focus:bg-black/35 transition-all rounded-xl px-4 py-3 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white text-sm placeholder:text-gray-600 shadow-inner"
-              required
-              disabled={isLoading}
-            />
-          </div>
+          {!isNewProject ? (
+            <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/30 border border-[#0CA3E7]/10 transition-all">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">Select Project*</label>
+                <Dropdown
+                    value={selectedProject}
+                    onChange={handleProjectSelect}
+                    options={userProjects}
+                    optionLabel="Title"
+                    itemTemplate={projectOptionTemplate}
+                    placeholder="Choose an existing project"
+                    className="w-full bg-black/40 border-white/10 text-sm custom-dropdown"
+                    panelClassName="bg-[#1e293b] border-[#0CA3E7]/30 shadow-2xl"
+                />
+            </div>
+          ) : (
+            <>
+                <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/30 border border-[#0CA3E7]/10 group focus-within:border-[#0CA3E7]/40 transition-all">
+                    <div className="flex items-center justify-between mb-2">
+                    <label htmlFor="url" className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] opacity-80">Image or video URL (Optional)</label>
+                    <GoQuestion
+                        size="1.1rem"
+                        className="cursor-pointer text-[#0CA3E7] hover:text-white transition-all"
+                        onClick={() => setShowVideo(!showVideo)}
+                    />
+                    </div>
+                    {showVideo && (
+                    <div className="absolute left-1/2 -translate-x-1/2 h-64 aspect-video z-50 top-10 max-w-[80vw] bg-black rounded-lg border border-[#0CA3E7]/20 shadow-2xl overflow-hidden animate-in zoom-in">
+                        <RxCross2
+                        className="absolute top-2 right-2 text-white hover:text-red-500 z-[80] cursor-pointer"
+                        onClick={() => setShowVideo(false)}
+                        />
+                    </div>
+                    )}
+                    <input
+                    id="url"
+                    value={url}
+                    onChange={(e) => seturl(e.target.value)}
+                    placeholder="https://example.com/image.jpg"
+                    className="bg-black/20 focus:bg-black/30 transition-all rounded-xl px-4 py-2.5 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white text-sm"
+                    disabled={isLoading}
+                    />
+                </div>
+
+                <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5 focus-within:border-[#0CA3E7]/40 transition-all">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">Project Title*</label>
+                    <input
+                    value={title}
+                    onChange={(e) => settitle(e.target.value)}
+                    placeholder="E.g., Modern E-commerce Platform"
+                    className="bg-black/20 focus:bg-black/35 transition-all rounded-xl px-4 py-3 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white text-sm placeholder:text-gray-600 shadow-inner"
+                    required
+                    disabled={isLoading}
+                    />
+                </div>
+            </>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5 focus-within:border-[#0CA3E7]/40 transition-all">
@@ -151,7 +242,9 @@ const Createauction = ({ show, setshow }) => {
             </div>
 
             <div className="px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">Source Code (.zip)*</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">
+                {isNewProject ? "Source Code (.zip)*" : "Update Source Code (Optional)"}
+              </label>
               <div className="relative group/file">
                 <input
                   type="file"
@@ -171,7 +264,7 @@ const Createauction = ({ show, setshow }) => {
             </div>
           </div>
 
-          <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5">
+          <div className="w-full px-4 py-3 rounded-2xl bg-[#1e293b]/20 border border-[#0CA3E7]/5 transition-all grow">
             <label className="text-[10px] font-bold uppercase tracking-widest text-[#0CA3E7] mb-2 block opacity-80">Project Description*</label>
             <textarea
               value={desc}
@@ -180,7 +273,7 @@ const Createauction = ({ show, setshow }) => {
               placeholder="Details about your project..."
               className="resize-none bg-black/20 focus:bg-black/30 transition-all rounded-xl px-4 py-2.5 w-full border border-white/10 focus:border-[#0CA3E7]/30 outline-none text-white text-sm"
               required
-              disabled={isLoading}
+              disabled={isLoading || !isNewProject}
             />
           </div>
         </div>
@@ -190,7 +283,7 @@ const Createauction = ({ show, setshow }) => {
             type="submit"
             placeholder={isLoading ? "Uploading..." : "Create Room"}
             className="text-sm px-8 py-1.5"
-            disabled={isLoading}
+            disabled={isLoading || (!isNewProject && !selectedProject)}
           />
           <button 
             type="button"

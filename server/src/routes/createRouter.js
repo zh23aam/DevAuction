@@ -4,16 +4,15 @@ const {google} = require('googleapis')
 const multer = require('multer')
 const path = require('path')
 const {
-    GOOGLE_DRIVE_FOLDER_ID,
-    GOOGLE_CLIENT_ID,
-    GOOGLE_CLIENT_SECRET,
     GOOGLE_REFRESH_TOKEN
 } = require('../../constants')
 const Room = require('../models/createRoom')
 const crypto = require('crypto')
 const Project = require('../models/project')
 const User = require("../models/user")
+const Auction = require('../models/Auction')
 const logger = require('../utils/logger')
+const livekitService = require('../services/livekitService')
 
 const router = express.Router()
 
@@ -214,12 +213,29 @@ router.post('/project', upload.single("file"), async (req,res)=>{
 })
 
 router.post("/room", upload.single("file"), async (req,res)=>{
+    const title = req.body.title
     try{
-        const currentFilename = req.file.filename
-        const fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename)).catch(err => {
-            logger.error(`[CREATE-ROOM] Google Drive upload error for room: `, err)
-            throw err
-        })
+        let finalFileID = req.body.fileID;
+
+        if (req.file) {
+            const currentFilename = req.file.filename
+            try {
+                const fileuploadResponse = await authorize().then(auth => uploadFile(auth, currentFilename))
+                finalFileID = fileuploadResponse.data.id
+                
+                // Cleanup temp file
+                fs.unlink(`./public/temp/${currentFilename}`, (err) => {
+                    if (err) logger.error(`[CREATE-ROOM] Error deleting temp file ${currentFilename}: `, err)
+                    else logger.info('Temp file deleted successfully!')
+                })
+            } catch (uploadErr) {
+                logger.error(`[CREATE-ROOM] Google Drive upload error: `, uploadErr)
+                // Cleanup even on failure
+                fs.unlink(`./public/temp/${currentFilename}`, () => {})
+                return res.status(500).json({ message: 'File upload failed' })
+            }
+        }
+
         const room_id = generateUniqueHexId()
 
         const {Owner ,Image,Status,Time,Title,Description,FileID, RoomID} = {
@@ -227,42 +243,66 @@ router.post("/room", upload.single("file"), async (req,res)=>{
             Image : req.body.image,
             Status: Boolean(false),
             Time: req.body.date,
-            Title : req.body.title,
+            Title : title,
             Description: req.body.description,
-            FileID : fileuploadResponse.data.id,
+            FileID : finalFileID,
             RoomID : room_id
         }
 
-
         if (!Owner || !Image || !Time || !Title || !Description || !FileID || !RoomID ) {
+            logger.warn(`[CREATE-ROOM] Missing required fields for room: ${title}`)
             return res.status(400).json({ message: 'Please fill in all required fields' })
         }else{
             const newRoom = new Room({Owner ,Image,Time,Title,Status,Description,FileID, RoomID, Bids : [], Sold : {}})
             await newRoom.save()
-            logger.info("Room created successfully")
+            logger.info(`[CREATE-ROOM] Room created successfully: ${room_id}`)
 
-            fs.unlink(`./public/temp/${currentFilename}`, (err) => {
-                if (err) {
-                    logger.error(`[CREATE-ROOM] Error deleting temp file ${currentFilename}: `, err)
-                } else {
-                    logger.info('File deleted successfully!')
-                }
-            })
+            // Create corresponding LiveKit room for video conferencing
+            try {
+              await livekitService.createRoom(room_id, `auction-${room_id}`);
+              logger.info(`[CREATE-ROOM] LiveKit room created: auction-${room_id}`);
+            } catch (livekitErr) {
+              logger.warn(`[CREATE-ROOM] LiveKit room creation failed (non-fatal): ${livekitErr.message}`);
+              // Non-fatal: auction can still proceed, LiveKit room will be auto-created on first join
+            }
+
+            // Create Auction document for bidding/state management
+            try {
+              const hostUser = await User.findOne({ 'UserInfo.email': req.body.email });
+              await Auction.create({
+                roomId: room_id,
+                hostId: hostUser?._id || new (require('mongoose').Types.ObjectId)(),
+                title: Title,
+                description: Description,
+                startingBid: 0,
+                currentHighestBid: 0,
+                minimumIncrement: 1,
+                originalDurationSeconds: 3600,
+                remainingSeconds: 3600,
+                status: 'pending',
+                livekitRoomName: `auction-${room_id}`,
+              });
+              logger.info(`[CREATE-ROOM] Auction document created for room: ${room_id}`);
+            } catch (auctionErr) {
+              logger.error(`[CREATE-ROOM] Auction document creation failed: ${auctionErr.message}`, {
+                stack: auctionErr.stack,
+                roomId: room_id,
+              });
+            }
 
             const user = await User.findOneAndUpdate({"UserInfo.email" : req.body.email},{ 
                 $push : {
                     "Profile.RoomsCreated" : room_id,
                 }
             })
-            await user.save()
+            if (user) await user.save()
 
             res.send({ RoomID : room_id})
         }
-
-        
     }catch(error)
     {
-        console.log(error)
+        logger.error(`[CREATE-ROOM] Fatal error: `, error)
+        res.status(500).json({ message: 'Internal Server Error' })
     }
 })
 

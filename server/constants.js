@@ -25,6 +25,38 @@ const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
 const GOOGLE_REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN
 const CORS_ORIGIN = process.env.CORS_ORIGIN
+const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY
+const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET
+const LIVEKIT_URL = process.env.LIVEKIT_URL
+const HOST_DISCONNECT_GRACE_PERIOD_MS = process.env.HOST_DISCONNECT_GRACE_PERIOD_MS || 300000
+const AUTH0_DOMAIN = process.env.AUTH0_DOMAIN
+const AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE
+
+/**
+ * Validate required environment variables
+ * Ensures critical backend credentials are configured before app starts
+ */
+function validateEnvironmentVariables() {
+  const missingVars = [];
+
+  // Check required variables
+  if (!LIVEKIT_API_KEY) missingVars.push('LIVEKIT_API_KEY');
+  if (!LIVEKIT_API_SECRET) missingVars.push('LIVEKIT_API_SECRET');
+  if (!LIVEKIT_URL) missingVars.push('LIVEKIT_URL');
+  if (!AUTH0_DOMAIN) missingVars.push('AUTH0_DOMAIN');
+  if (!AUTH0_AUDIENCE) missingVars.push('AUTH0_AUDIENCE');
+  if (!MONGODB_URL) missingVars.push('MONGODB_URL');
+  if (!DB_NAME) missingVars.push('DB_NAME');
+
+  if (missingVars.length > 0) {
+    const errorMessage = `Missing required environment variables: ${missingVars.join(', ')}. Please check your .env file.`;
+    console.error(`[ENVIRONMENT] ${errorMessage}`);
+    throw new Error(errorMessage);
+  }
+}
+
+// Validate on module load
+validateEnvironmentVariables();
 
 module.exports = {
   PORT,
@@ -39,6 +71,12 @@ module.exports = {
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
   GOOGLE_REFRESH_TOKEN,
-  CORS_ORIGIN
+  CORS_ORIGIN,
+  LIVEKIT_API_KEY,
+  LIVEKIT_API_SECRET,
+  LIVEKIT_URL,
+  HOST_DISCONNECT_GRACE_PERIOD_MS,
+  AUTH0_DOMAIN,
+  AUTH0_AUDIENCE
 }
 

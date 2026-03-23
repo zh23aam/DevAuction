@@ -3,7 +3,8 @@ import Dashbord from "./Pages/Dashboardpage/Dashbord";
 import Gallery from "./Components/GallerySection/Gallery";
 import Preview from "./Pages/preview/Preview";
 import HomePage from "./Pages/Home page/HomePage";
-import RoomX from "./Pages/Meeting Room/RoomX"
+import AuctionRoom from "./Pages/AuctionRoom";
+import Auctionrooms from "./Components/AuctionRoom/Auctionrooms";
 import {
   createBrowserRouter,
   RouterProvider,
@@ -15,6 +16,7 @@ import { MenuProvider } from "./context/MenuContextProvider";
 import ErrorBoundary from "./Components/Common/ErrorBoundary";
 import ErrorSection from "./Components/Common/ErrorSection";
 import { ToastProvider } from "./context/ToastContext";
+import AuctionSummary from "./Pages/Auction/AuctionSummary";
 
 const router = createBrowserRouter([
   {
@@ -38,10 +40,12 @@ const router = createBrowserRouter([
       { path: "/homepage/profile/:id?", element: <Profile /> },
       { path: "/homepage/chats", element: <Chat /> },
       { path: "/homepage/gallery" , element: <Gallery/> },
-      { path: "/homepage/gallery/preview/:id" , element: <Preview />}
+      { path: "/homepage/gallery/preview/:id" , element: <Preview />},
+      {path: "/homepage/auction", element: <Auctionrooms />},
+      {path:"/homepage/auction/:auctionId/summary", element: <AuctionSummary />}
     ],
   },
-  {path: "/room/:roomID", element: <RoomX />}
+  {path: "/auction/:auctionId", element: <AuctionRoom />},
 ]);
 
 function App() {

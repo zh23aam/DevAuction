@@ -1,9 +1,22 @@
 import React from 'react'
+import { useNavigate } from 'react-router-dom'
 import logo from '../../../public/Icons/Logo.png'
 import menuIcon from '../../../public/Icons/iconsmenu.png'
 import LogoutButton from '../Gradient Btn/LogoutButton'
 
 function LeftNavbar({show, isnav, setisnav }) {
+  const navigate = useNavigate()
+
+  const handleAuctionClick = () => {
+    navigate(-1)
+    setisnav(false)
+  }
+
+  const handleGalleryClick = () => {
+    navigate('/homepage/gallery')
+    setisnav(false)
+  }
+
   return (
     <>
       <nav className={(isnav ? 'flex bg-[#050618] z-10 text-white h-[100vh]   pt-4 flex-col justify-between  items-center absolute top-0 left-0' : 'hidden md:flex basis-[20%] bg-[#050618] text-white h-[100vh]   pt-4 flex-col justify-between  items-center') + `${show ? " blur-xl " : ""}`}>
@@ -23,14 +36,14 @@ function LeftNavbar({show, isnav, setisnav }) {
           </span></div> : ""}
           </div>
 
-          <div className='mt-20  text-[16px] flex justify-center items-center bg-gradient-to-b from-[#0CA3E7] to-[#050618] py-2 rounded-xl cursor-pointer'>
+          <div onClick={handleAuctionClick} className='mt-20  text-[16px] flex justify-center items-center bg-gradient-to-b from-[#0CA3E7] to-[#050618] py-2 rounded-xl cursor-pointer hover:from-[#0CA3E7] hover:to-[#0a1f2e] transition-all'>
             <span className="material-symbols-outlined text-[24px]">
-              home
+              gavel
             </span>
-            <span className='font-semibold ml-2'>Auction</span>
+            <span className='font-semibold ml-2'>Live Auction</span>
           </div>
 
-          <div className=' mt-5  text-[16px] flex justify-center items-center bg-gradient-to-b from-[#0CA3E7] to-[#050618] py-2 rounded-xl cursor-pointer'>
+          <div onClick={handleGalleryClick} className=' mt-5  text-[16px] flex justify-center items-center bg-gradient-to-b from-[#0CA3E7] to-[#050618] py-2 rounded-xl cursor-pointer hover:from-[#0CA3E7] hover:to-[#0a1f2e] transition-all'>
             <span className="material-symbols-outlined text-[24px] ">
               database
             </span>

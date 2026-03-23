@@ -114,7 +114,7 @@ import { useMenuContext } from "../../context/MenuContextProvider";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useSocket } from "../../context/SocketProvider";
 import { GrGallery } from "react-icons/gr";
-import { ToastProvider } from "../../context/ToastContext";
+import { GiGavel } from "react-icons/gi";
 
 export default function HomePage() {
   const { user } = useAuth0();
@@ -228,6 +228,18 @@ export default function HomePage() {
               >
                 <GrGallery />
                 Gallery
+              </NavLink>
+              <NavLink
+                to={"/homepage/auction"}
+                onClick={() => setShowMenu(false)}
+                className={({ isActive }) =>
+                  isActive
+                    ? "text-white flex gap-2 items-center p-2 active"
+                    : "flex gap-2 items-center p-2 navLink"
+                }
+              >
+                <GiGavel />
+                Live Auction
               </NavLink>
             </div>
             <LogoutButton />

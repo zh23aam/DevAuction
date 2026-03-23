@@ -1,0 +1,96 @@
+/* ConnectionQualityIndicator Component Styles */
+
+.connection-quality-indicator {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+/* Individual bar */
+.connection-quality-indicator__bar {
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  transition: all 200ms ease-in-out;
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Bar heights for visual effect */
+.connection-quality-indicator__bar:nth-child(1) {
+  height: 6px;
+}
+
+.connection-quality-indicator__bar:nth-child(2) {
+  height: 9px;
+}
+
+.connection-quality-indicator__bar:nth-child(3) {
+  height: 12px;
+}
+
+.connection-quality-indicator__bar:nth-child(4) {
+  height: 15px;
+}
+
+/* Active bar state */
+.connection-quality-indicator__bar--active {
+  transition: all 200ms ease-in-out;
+}
+
+/* Mobile responsive */
+@media (max-width: 767px) {
+  .connection-quality-indicator {
+    gap: 2px;
+  }
+
+  .connection-quality-indicator__bar {
+    width: 2px;
+    height: 10px;
+    border-radius: 1px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(1) {
+    height: 5px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(2) {
+    height: 7px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(3) {
+    height: 10px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(4) {
+    height: 12px;
+  }
+}
+
+/* Desktop responsive */
+@media (min-width: 768px) {
+  .connection-quality-indicator {
+    gap: 3px;
+  }
+
+  .connection-quality-indicator__bar {
+    width: 3px;
+    height: 12px;
+    border-radius: 2px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(1) {
+    height: 6px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(2) {
+    height: 9px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(3) {
+    height: 12px;
+  }
+
+  .connection-quality-indicator__bar:nth-child(4) {
+    height: 15px;
+  }
+}

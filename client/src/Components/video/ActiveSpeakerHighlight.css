@@ -1,0 +1,58 @@
+/* ActiveSpeakerHighlight Component Styles */
+
+.active-speaker-highlight {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  pointer-events: none;
+  z-index: 5;
+  transition: all 300ms ease-in-out;
+}
+
+/* Active speaker state */
+.active-speaker-highlight--active {
+  border-color: #10b981;
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), inset 0 0 16px rgba(16, 185, 129, 0.2);
+  animation: speaker-glow 2s ease-in-out infinite;
+}
+
+/* Glow animation */
+@keyframes speaker-glow {
+  0% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), inset 0 0 16px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(16, 185, 129, 0.8), inset 0 0 20px rgba(16, 185, 129, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), inset 0 0 16px rgba(16, 185, 129, 0.2);
+  }
+}
+
+/* Mobile responsive */
+@media (max-width: 767px) {
+  .active-speaker-highlight {
+    border-width: 2px;
+    border-radius: 6px;
+  }
+
+  .active-speaker-highlight--active {
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.5), inset 0 0 12px rgba(16, 185, 129, 0.15);
+  }
+}
+
+/* Desktop responsive */
+@media (min-width: 768px) {
+  .active-speaker-highlight {
+    border-width: 2px;
+    border-radius: 8px;
+  }
+
+  .active-speaker-highlight--active {
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.6), inset 0 0 16px rgba(16, 185, 129, 0.2);
+  }
+}

@@ -131,19 +131,19 @@ const Auctionrooms = ({ show, setshow, showdownload, setShowdownload }) => {
           />
         </div>
 
-        <div className="flex flex-col justify-center items-center w-full min-h-[300px]">
+        <div className="flex flex-col items-start w-full min-h-[300px]">
           {error ? (
-            <div className="text-red-500 text-center">
+            <div className="text-red-500 w-full text-center">
               <p>Error: {error}</p>
               <button onClick={() => fetchRooms(selectOption)} className="underline">Retry</button>
             </div>
           ) : isLoading && currentRooms.length === 0 ? (
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center w-full">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mb-4"></div>
               <p>Searching for rooms...</p>
             </div>
           ) : (
-            <div className="flex flex-wrap gap-2 justify-evenly transition-all duration-200">
+            <div className="flex flex-wrap gap-8 justify-start transition-all duration-200 w-full">
               {currentRooms.length === 0 ? (
                 <p className="text-gray-500 mt-10">No {selectOption} rooms found.</p>
               ) : (
@@ -154,6 +154,8 @@ const Auctionrooms = ({ show, setshow, showdownload, setShowdownload }) => {
                     date={elem.Time}
                     imgSrc={elem.Image}
                     title={elem.Title}
+                    description={elem.Description}
+                    owner={elem.Owner}
                     status={elem.Status}
                     key={elem.RoomID + index}
                   />

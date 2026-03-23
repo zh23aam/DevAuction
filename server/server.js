@@ -18,6 +18,8 @@ const projectRouter = require('./src/routes/projectsRouter')
 const profileRouter = require("./src/routes/profileRouter")
 const liveStreamRouter = require("./src/routes/livestream")
 const galleryRouter = require("./src/routes/gallery")
+const auctionRoutes = require("./src/routes/auctionRoutes")
+const { setupAuctionSocket } = require("./src/socket/auctionSocket")
 
 //mongodb connection
 ConnectDB()
@@ -71,6 +73,9 @@ const io = new Server(server, {
         credentials: true
     }
 })
+
+// Initialize auction socket handlers
+setupAuctionSocket(io)
 
 //mapping
 const emailToSocketIdMap = new Map()
@@ -156,6 +161,9 @@ app.use("/project",projectRouter)
 app.use("/profile",profileRouter)
 app.use("/livestream",liveStreamRouter)
 app.use("/gallery", galleryRouter)
+app.use("/api/auctions", auctionRoutes)
 
 // to start chat cleanup process every midnight
 // cleanupJob.start()
+
+module.exports = app;
